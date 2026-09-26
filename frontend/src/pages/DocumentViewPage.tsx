@@ -5,10 +5,10 @@
  * Accessible from Search results or Documents table.
  */
 
-import type { DocFile } from "../lib/api";
+import type { DocFile, DocDetail } from "../lib/api";
 import { api } from "../lib/api";
 import { formatFileSize, formatDate } from "../lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface DocumentViewPageProps {
   doc: DocFile;
@@ -18,6 +18,24 @@ interface DocumentViewPageProps {
 
 export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPageProps) {
   const [deleting, setDeleting] = useState(false);
+  const [detail, setDetail] = useState<DocDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const fullDoc = await api.getDocument(doc.id);
+        setDetail(fullDoc);
+      } catch (err) {
+        setError((err as Error).message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [doc.id]);
 
   async function handleDelete() {
     if (!confirm(`Delete "${doc.filename}"? This cannot be undone.`)) return;
@@ -124,6 +142,37 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
           to their positions for fast TF-IDF ranked retrieval. Deleting this document also removes its
           postings from the index.
         </span>
+      </div>
+
+      {/* Document Content */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
+        <h2 className="text-title-md" style={{ color: "var(--color-on-surface)" }}>Content</h2>
+        {loading ? (
+          <div style={{ padding: "var(--space-md)", color: "var(--color-outline)" }}>Loading content...</div>
+        ) : error ? (
+          <div style={{ padding: "var(--space-md)", color: "var(--color-error)", background: "var(--color-error-container)", borderRadius: "var(--radius-sm)" }}>
+            Error loading content: {error}
+          </div>
+        ) : detail ? (
+          <pre
+            style={{
+              background: "var(--color-surface-container-low)",
+              padding: "var(--space-md)",
+              borderRadius: "var(--radius-sm)",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              maxHeight: "500px",
+              overflowY: "auto",
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.875rem",
+              lineHeight: 1.5,
+              color: "var(--color-on-surface)",
+              border: "1px solid var(--color-outline-variant)"
+            }}
+          >
+            {detail.content}
+          </pre>
+        ) : null}
       </div>
     </div>
   );

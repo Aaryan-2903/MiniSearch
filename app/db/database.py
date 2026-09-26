@@ -19,13 +19,20 @@ from contextlib import contextmanager
 DB_PATH: str = os.getenv("DATABASE_URL", "./database.db")
 
 _CREATE_SCHEMA = """
+    CREATE TABLE IF NOT EXISTS folders (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT    NOT NULL UNIQUE,
+        created_at TEXT    NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS documents (
         id          INTEGER PRIMARY KEY AUTOINCREMENT,
         filename    TEXT    NOT NULL,
         filepath    TEXT    NOT NULL,
         file_size   INTEGER NOT NULL,
         token_count INTEGER NOT NULL,
-        uploaded_at TEXT    NOT NULL
+        uploaded_at TEXT    NOT NULL,
+        folder_id   INTEGER REFERENCES folders(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS postings (
@@ -81,3 +88,8 @@ def init_db() -> None:
     """Create all tables and indexes if they do not already exist."""
     with get_db() as conn:
         conn.executescript(_CREATE_SCHEMA)
+        # Migrate existing databases if documents table was created without folder_id
+        cursor = conn.execute("PRAGMA table_info(documents)")
+        existing_cols = {row["name"] for row in cursor.fetchall()}
+        if "folder_id" not in existing_cols:
+            conn.execute("ALTER TABLE documents ADD COLUMN folder_id INTEGER REFERENCES folders(id) ON DELETE SET NULL")

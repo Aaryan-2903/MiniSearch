@@ -7,9 +7,16 @@ Document management endpoints:
     DELETE /documents/{doc_id} — delete a document and its index entries
 """
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from typing import Optional
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
-from app.schemas.document import DocumentListOut, DocumentOut
+from app.schemas.document import (
+    DocumentCopyRequest,
+    DocumentDetailOut,
+    DocumentListOut,
+    DocumentOut,
+    DocumentUpdate,
+)
 from app.services import document_service
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -19,20 +26,42 @@ MAX_FILE_SIZE = 5 * 1024 * 1024
 
 
 @router.get("", response_model=DocumentListOut, summary="List all documents")
-def list_documents():
-    """Return metadata for every document currently in the corpus."""
-    docs = document_service.list_documents()
+def list_documents(folder_id: Optional[int] = None):
+    """Return metadata for documents currently in the corpus, optionally filtered by folder_id."""
+    docs = document_service.list_documents(folder_id=folder_id)
     return {"total": len(docs), "documents": docs}
 
 
+@router.get("/{doc_id}", response_model=DocumentDetailOut, summary="Get document by ID")
+def get_document(doc_id: int):
+    """Return document metadata and its text content."""
+    try:
+        doc = document_service.get_document(doc_id)
+        if not doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document with id={doc_id} was not found.",
+            )
+        return doc
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Document record exists, but the file is missing from disk.",
+        )
+
+
 @router.post("", response_model=DocumentOut, status_code=201, summary="Upload a document")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(
+    file: UploadFile = File(...),
+    folder_id: Optional[int] = Form(None),
+):
     """
     Accept a `.txt` file, preprocess it, and add it to the search index.
 
     - Only `.txt` files are accepted.
     - Files larger than 5 MB are rejected.
     - Duplicate filenames are allowed (each upload gets its own ID).
+    - Can optionally specify folder_id to store in a folder.
     """
     if not file.filename or not file.filename.lower().endswith(".txt"):
         raise HTTPException(
@@ -51,8 +80,57 @@ async def upload_document(file: UploadFile = File(...)):
             detail=f"File exceeds the maximum allowed size of {MAX_FILE_SIZE // (1024*1024)} MB.",
         )
 
-    doc = document_service.upload_document(file.filename, content)
-    return doc
+    try:
+        doc = document_service.upload_document(file.filename, content, folder_id=folder_id)
+        return doc
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/{doc_id}", response_model=DocumentOut, summary="Update document (rename or move)")
+def update_document(doc_id: int, payload: DocumentUpdate):
+    """
+    Rename a document or move it to a folder (or root).
+    """
+    try:
+        update_dict = payload.model_dump(exclude_unset=True)
+        if not update_dict:
+            raise HTTPException(status_code=400, detail="No fields provided to update.")
+
+        doc = None
+        if "filename" in update_dict:
+            doc = document_service.rename_document(doc_id, update_dict["filename"])
+            if not doc:
+                raise HTTPException(status_code=404, detail=f"Document with id={doc_id} was not found.")
+
+        if "folder_id" in update_dict:
+            doc = document_service.move_document(doc_id, update_dict["folder_id"])
+            if not doc:
+                raise HTTPException(status_code=404, detail=f"Document with id={doc_id} was not found.")
+
+        return doc
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{doc_id}/copy", response_model=DocumentOut, status_code=201, summary="Copy a document")
+def copy_document(doc_id: int, payload: Optional[DocumentCopyRequest] = None):
+    """
+    Copy a document into a folder (or root).
+    Creates a new document record, duplicates file contents, and indexes the copy.
+    """
+    target_folder_id = payload.folder_id if payload else None
+    try:
+        doc = document_service.copy_document(doc_id, target_folder_id=target_folder_id)
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document with id={doc_id} was not found.")
+        return doc
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/{doc_id}", status_code=204, summary="Delete a document")
@@ -67,3 +145,4 @@ def delete_document(doc_id: int):
             status_code=404,
             detail=f"Document with id={doc_id} was not found.",
         )
+

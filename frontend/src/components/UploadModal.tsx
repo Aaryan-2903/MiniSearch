@@ -7,8 +7,10 @@
  * Shows per-file upload states; refreshes parent on success.
  */
 
-import { useRef, useState, useCallback, DragEvent } from "react";
+import { useRef, useState, useCallback } from "react";
+import type { DragEvent } from "react";
 import { api } from "../lib/api";
+import type { Folder } from "../lib/api";
 import { formatFileSize } from "../lib/utils";
 
 interface StagedFile {
@@ -18,11 +20,14 @@ interface StagedFile {
 }
 
 interface UploadModalProps {
+  folders?: Folder[];
+  defaultFolderId?: number | null;
   onClose: () => void;
   onUploaded: () => void;
 }
 
-export function UploadModal({ onClose, onUploaded }: UploadModalProps) {
+export function UploadModal({ folders = [], defaultFolderId = null, onClose, onUploaded }: UploadModalProps) {
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(defaultFolderId);
   const [staged, setStaged] = useState<StagedFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -74,7 +79,7 @@ export function UploadModal({ onClose, onUploaded }: UploadModalProps) {
         setStaged((prev) =>
           prev.map((x, xi) => (xi === i ? { ...x, status: "uploading" } : x))
         );
-        await api.uploadDocument(s.file);
+        await api.uploadDocument(s.file, selectedFolderId);
         setStaged((prev) =>
           prev.map((x, xi) => (xi === i ? { ...x, status: "done" } : x))
         );
@@ -128,6 +133,34 @@ export function UploadModal({ onClose, onUploaded }: UploadModalProps) {
         </div>
 
         <div className="modal-body">
+          {/* Destination Folder Selector */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingBottom: "2px" }}>
+            <label htmlFor="upload-folder-select" className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-on-surface-variant)" }}>
+              Destination Folder
+            </label>
+            <select
+              id="upload-folder-select"
+              value={selectedFolderId ?? ""}
+              onChange={(e) => setSelectedFolderId(e.target.value === "" ? null : Number(e.target.value))}
+              style={{
+                background: "var(--color-surface-container-low)",
+                color: "var(--color-on-surface)",
+                border: "1px solid var(--color-outline-variant)",
+                borderRadius: "var(--radius-xs)",
+                padding: "4px 8px",
+                fontSize: "0.8125rem",
+                cursor: "pointer",
+              }}
+            >
+              <option value="">Root / All Documents</option>
+              {folders.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Drop zone */}
           <div
             className={`drop-zone${dragging ? " dragging" : ""}`}

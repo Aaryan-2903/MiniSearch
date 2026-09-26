@@ -3,17 +3,20 @@
  * --------------
  * Search home (no active query): heading, search input, index stats row,
  * quick filters, and a recently-added documents list.
- * When a query is entered, live results are shown inline.
+ * When a query is entered, live results are shown inline with TF-IDF ranking,
+ * match mode toggling (any/all), multi-term highlighting, and detailed explanation.
  */
 
-import { useState, useEffect, useRef, KeyboardEvent } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import type { KeyboardEvent } from "react";
 import { api } from "../lib/api";
-import type { SearchResponse, SearchResultItem, IndexStats, DocFile } from "../lib/api";
-import { formatFileSize, formatDate } from "../lib/utils";
+import type { SearchResponse, SearchResultItem, IndexStats, DocFile, Folder } from "../lib/api";
+import { formatFileSize, scorePercent } from "../lib/utils";
 
 interface SearchPageProps {
   stats: IndexStats | null;
   recentDocs: DocFile[];
+  folders?: Folder[];
   onViewDocument: (doc: DocFile) => void;
 }
 
@@ -27,6 +30,7 @@ function ScoreBar({ score }: { score: number }) {
 }
 
 function WhyPanel({ item }: { item: SearchResultItem }) {
+  const exp = item.explanation;
   const pctVal = Math.min(item.score * 100, 100);
   const isHigh = pctVal >= 70;
 
@@ -46,63 +50,90 @@ function WhyPanel({ item }: { item: SearchResultItem }) {
             }}
           />
           <span className="text-mono-meta" style={{ color: isHigh ? "var(--color-secondary)" : "var(--color-outline)" }}>
-            {isHigh ? "Strong match" : "Partial match"}
+            {isHigh ? "High relevance" : "Moderate relevance"}
           </span>
         </span>
       </div>
 
       <div className="why-grid">
-        {/* Score */}
+        {/* Total Score */}
         <div className="why-cell">
           <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
-            TF-IDF Score
+            Total Score
           </span>
           <span className="text-headline-sm" style={{ color: "var(--color-primary)", fontWeight: 600 }}>
             {scorePercent(item.score)}
           </span>
           <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "4px" }}>
-            {item.score.toFixed(4)} raw score
+            {item.score.toFixed(4)} TF-IDF
           </span>
         </div>
 
-        {/* Matched terms */}
+        {/* Coverage & Matched Terms */}
         <div className="why-cell">
           <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
-            Matched Terms
+            Coverage
           </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "4px" }}>
-            {item.matched_terms.slice(0, 4).map((t) => (
-              <div key={t} style={{ display: "flex", justifyContent: "space-between" }}>
-                <span className="text-mono-meta" style={{ color: "var(--color-on-surface)" }}>{t}</span>
-                <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>matched</span>
-              </div>
-            ))}
-          </div>
+          <span className="text-body-sm" style={{ color: "var(--color-on-surface)", fontWeight: 600, marginTop: "2px" }}>
+            {exp ? `${exp.matched_terms_count} / ${exp.query_terms_count} query terms` : `${item.matched_terms.length} matched`}
+          </span>
+          <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "4px" }}>
+            Matched terms: {item.matched_terms.join(" · ")}
+          </span>
         </div>
 
-        {/* Ranking signals */}
-        <div className="why-cell">
-          <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
-            Ranking Signals
+        {/* Term-by-term details */}
+        <div className="why-cell" style={{ gridColumn: "1 / -1" }}>
+          <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)", marginBottom: "6px" }}>
+            Term Frequency · Document Frequency · TF-IDF Contribution
           </span>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "4px" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: isHigh ? "var(--color-secondary)" : "var(--color-outline)", flexShrink: 0 }} />
-              <span className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>
-                {item.matched_terms.length} of {item.matched_terms.length} query terms present
-              </span>
-            </span>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: isHigh ? "var(--color-secondary)" : "var(--color-outline)", flexShrink: 0 }} />
-              <span className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>
-                {pctVal >= 70 ? "High term density" : pctVal >= 40 ? "Moderate term density" : "Low term density"}
-              </span>
-            </span>
-          </div>
+          {exp && exp.term_details && exp.term_details.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "4px" }}>
+              {exp.term_details.map((td) => (
+                <div
+                  key={td.term}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "6px 10px",
+                    background: "var(--color-surface-container)",
+                    borderRadius: "var(--radius-xs)",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  <span className="text-mono-meta" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>
+                    {td.term}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+                      Term frequency: <strong style={{ color: "var(--color-on-surface)" }}>{td.tf}</strong>
+                    </span>
+                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+                      Document frequency: <strong style={{ color: "var(--color-on-surface)" }}>{td.df} / {exp.total_documents}</strong>
+                    </span>
+                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+                      TF-IDF contribution: <strong style={{ color: "var(--color-primary)" }}>{td.tfidf.toFixed(4)}</strong>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "4px" }}>
+              {item.matched_terms.map((t) => (
+                <div key={t} style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span className="text-mono-meta" style={{ color: "var(--color-on-surface)" }}>{t}</span>
+                  <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>matched</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Confidence bar */}
+      {/* Relevance Bar */}
       <div
         style={{
           background: "var(--color-surface-container-low)",
@@ -114,10 +145,10 @@ function WhyPanel({ item }: { item: SearchResultItem }) {
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>Confidence</span>
+          <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>Relevance</span>
           <span className="text-mono-meta" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>
-            {pctVal >= 70 ? "High precision · " : pctVal >= 40 ? "Moderate · " : "Low · "}
-            Normalized {item.score.toFixed(3)}
+            {isHigh ? "High relevance · " : "Moderate relevance · "}
+            Score {item.score.toFixed(4)}
           </span>
         </div>
         <ScoreBar score={item.score} />
@@ -126,35 +157,94 @@ function WhyPanel({ item }: { item: SearchResultItem }) {
   );
 }
 
-function ResultCard({ item, isFirst }: { item: SearchResultItem; isFirst: boolean }) {
+function highlightSnippet(snippetText: string, terms: string[]) {
+  if (!terms || terms.length === 0 || !snippetText) {
+    return snippetText;
+  }
+
+  const cleanTerms = Array.from(new Set(terms.filter((t) => t.trim().length > 0)));
+  if (cleanTerms.length === 0) return snippetText;
+
+  // Sort descending by length so longer phrases/words match first
+  cleanTerms.sort((a, b) => b.length - a.length);
+
+  const escaped = cleanTerms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const regex = new RegExp(`(${escaped.join("|")})`, "gi");
+  const matchSet = new Set(cleanTerms.map((t) => t.toLowerCase()));
+  const parts = snippetText.split(regex);
+
+  return parts.map((part, idx) => {
+    if (matchSet.has(part.toLowerCase())) {
+      return <mark key={idx}>{part}</mark>;
+    }
+    return part;
+  });
+}
+
+function ResultCard({
+  item,
+  isFirst,
+  onOpen,
+}: {
+  item: SearchResultItem;
+  isFirst: boolean;
+  onOpen: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const pct = Math.min(Math.round(item.score * 100), 100);
   const isHigh = pct >= 70;
-
-  // Highlight matched terms in snippet
-  function renderSnippet(raw: string) {
-    if (!item.matched_terms.length) return raw;
-    const escaped = item.matched_terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    const re = new RegExp(`(${escaped.join("|")})`, "gi");
-    const parts = raw.split(re);
-    return parts.map((part, i) =>
-      re.test(part) ? <mark key={i}>{part}</mark> : part
-    );
-  }
 
   return (
     <article className="result-card" id={`result-${item.doc_id}`}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-md)" }}>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span className="icon" style={{ fontSize: "16px", color: isFirst ? "var(--color-primary)" : "var(--color-outline)" }}>description</span>
-            <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)", fontWeight: 600, letterSpacing: "-0.01em" }}>
+          <div
+            onClick={onOpen}
+            style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}
+            title="Open document"
+          >
+            <span className="icon" style={{ fontSize: "16px", color: isFirst ? "var(--color-primary)" : "var(--color-outline)" }}>
+              description
+            </span>
+            <h2
+              className="text-headline-sm"
+              style={{
+                color: "var(--color-on-surface)",
+                fontWeight: 600,
+                letterSpacing: "-0.01em",
+                textDecoration: "underline",
+                textDecorationColor: "transparent",
+                transition: "text-decoration-color 120ms",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.textDecorationColor = "var(--color-primary)")}
+              onMouseLeave={(e) => (e.currentTarget.style.textDecorationColor = "transparent")}
+            >
               {item.filename}
             </h2>
           </div>
-          <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "2px" }}>
-            {item.filename}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "2px", flexWrap: "wrap" }}>
+            <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+              {item.filename}
+            </span>
+            {item.folder_name && (
+              <>
+                <span className="text-mono-meta" style={{ color: "color-mix(in srgb, var(--color-on-surface-variant) 40%, transparent)" }}>/</span>
+                <span
+                  className="text-mono-meta"
+                  style={{
+                    color: "var(--color-primary)",
+                    fontWeight: 600,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                  }}
+                >
+                  <span className="icon" style={{ fontSize: "13px" }}>folder</span>
+                  {item.folder_name}
+                </span>
+              </>
+            )}
+          </div>
         </div>
         <div style={{ flexShrink: 0 }}>
           <span className={isHigh ? "score-badge score-badge-high" : "score-badge score-badge-low"}>
@@ -163,9 +253,9 @@ function ResultCard({ item, isFirst }: { item: SearchResultItem; isFirst: boolea
         </div>
       </div>
 
-      {/* Snippet */}
+      {/* Snippet with multi-term highlighting */}
       <div className="snippet">
-        …{renderSnippet(item.snippet)}…
+        …{highlightSnippet(item.snippet, item.matched_terms)}…
       </div>
 
       {/* Term badges + Why button */}
@@ -213,13 +303,16 @@ function ResultCard({ item, isFirst }: { item: SearchResultItem; isFirst: boolea
   );
 }
 
-export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProps) {
+export function SearchPage({ stats, recentDocs, folders = [], onViewDocument }: SearchPageProps) {
   const [query, setQuery] = useState("");
+  const [matchMode, setMatchMode] = useState<"any" | "all">("any");
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<"relevance" | "name_asc" | "name_desc">("relevance");
   const [results, setResults] = useState<SearchResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     const handler = (e: globalThis.KeyboardEvent) => {
@@ -240,14 +333,30 @@ export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProp
       setError(null);
       return;
     }
-    debounceRef.current = setTimeout(() => doSearch(q), 300);
+    debounceRef.current = setTimeout(() => doSearch(q, matchMode, selectedFolderId), 300);
   }
 
-  async function doSearch(q: string) {
+  function handleMatchModeChange(mode: "any" | "all") {
+    setMatchMode(mode);
+    if (query.trim()) {
+      clearTimeout(debounceRef.current);
+      doSearch(query, mode, selectedFolderId);
+    }
+  }
+
+  function handleFolderChange(folderId: number | null) {
+    setSelectedFolderId(folderId);
+    if (query.trim()) {
+      clearTimeout(debounceRef.current);
+      doSearch(query, matchMode, folderId);
+    }
+  }
+
+  async function doSearch(q: string, mode: "any" | "all", folderId: number | null = selectedFolderId) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.search(q);
+      const res = await api.search(q, 10, mode, folderId);
       setResults(res);
     } catch (e) {
       setError((e as Error).message);
@@ -266,9 +375,21 @@ export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProp
     }
     if (e.key === "Enter" && query.trim()) {
       clearTimeout(debounceRef.current);
-      doSearch(query);
+      doSearch(query, matchMode, selectedFolderId);
     }
   }
+
+  // Sort presentation order only (does NOT modify underlying TF-IDF score)
+  const displayedResults = useMemo(() => {
+    if (!results) return [];
+    const list = [...results.results];
+    if (sortBy === "name_asc") {
+      list.sort((a, b) => a.filename.localeCompare(b.filename));
+    } else if (sortBy === "name_desc") {
+      list.sort((a, b) => b.filename.localeCompare(a.filename));
+    }
+    return list;
+  }, [results, sortBy]);
 
   const QUICK_FILTERS = ["data structures", "binary search", "async await", "inverted index"];
 
@@ -351,7 +472,83 @@ export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProp
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Search Controls: Match Mode & Folder Scope */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem", flexWrap: "wrap", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span className="text-label-sm" style={{ color: "var(--color-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+              Match:
+            </span>
+            <div style={{ display: "inline-flex", background: "var(--color-surface-container-low)", borderRadius: "var(--radius-xs)", padding: "2px", border: "1px solid var(--color-outline-variant)" }}>
+              <button
+                type="button"
+                id="match-mode-any"
+                onClick={() => handleMatchModeChange("any")}
+                style={{
+                  background: matchMode === "any" ? "var(--color-surface-container-highest)" : "transparent",
+                  color: matchMode === "any" ? "var(--color-on-surface)" : "var(--color-on-surface-variant)",
+                  border: "none",
+                  padding: "3px 10px",
+                  borderRadius: "var(--radius-xs)",
+                  fontSize: "0.75rem",
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: matchMode === "any" ? 600 : 400,
+                  cursor: "pointer",
+                }}
+              >
+                Any term
+              </button>
+              <button
+                type="button"
+                id="match-mode-all"
+                onClick={() => handleMatchModeChange("all")}
+                style={{
+                  background: matchMode === "all" ? "var(--color-surface-container-highest)" : "transparent",
+                  color: matchMode === "all" ? "var(--color-on-surface)" : "var(--color-on-surface-variant)",
+                  border: "none",
+                  padding: "3px 10px",
+                  borderRadius: "var(--radius-xs)",
+                  fontSize: "0.75rem",
+                  fontFamily: "var(--font-mono)",
+                  fontWeight: matchMode === "all" ? 600 : 400,
+                  cursor: "pointer",
+                }}
+              >
+                All terms
+              </button>
+            </div>
+          </div>
+
+          {/* Folder scope selector */}
+          {folders.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <label htmlFor="search-folder-select" className="text-label-sm" style={{ color: "var(--color-on-surface-variant)", textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600 }}>
+                Folder:
+              </label>
+              <select
+                id="search-folder-select"
+                value={selectedFolderId ?? ""}
+                onChange={(e) => handleFolderChange(e.target.value === "" ? null : Number(e.target.value))}
+                style={{
+                  background: "var(--color-surface-container-low)",
+                  color: "var(--color-on-surface)",
+                  border: "1px solid var(--color-outline-variant)",
+                  borderRadius: "var(--radius-xs)",
+                  padding: "3px 8px",
+                  fontSize: "0.75rem",
+                  fontFamily: "var(--font-mono)",
+                  cursor: "pointer",
+                }}
+              >
+                <option value="">All folders (Global)</option>
+                {folders.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Stats row (when no results active) */}
         {stats && !results && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0 4px", marginBottom: "2rem" }}>
             <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
@@ -387,14 +584,51 @@ export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProp
         {/* Search results */}
         {results && !error && (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)", marginTop: "8px", paddingBottom: "4rem" }}>
-            {/* Results meta */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 2px" }}>
-              <span className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", fontWeight: 500 }}>
-                {results.total_results} result{results.total_results !== 1 ? "s" : ""} found
-              </span>
-              <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
-                Sorted by Relevance (TF-IDF)
-              </span>
+            {/* Results meta and filename sorting */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", padding: "0 2px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span className="text-body-sm" style={{ color: "var(--color-on-surface)", fontWeight: 500 }}>
+                  {results.total_results} result{results.total_results !== 1 ? "s" : ""}
+                </span>
+                <span className="text-mono-meta" style={{ color: "var(--color-outline)" }}>·</span>
+                <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+                  {results.execution_time_ms} ms
+                </span>
+                <span className="text-mono-meta" style={{ color: "var(--color-outline)" }}>·</span>
+                <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+                  {results.query_terms_count} term{results.query_terms_count !== 1 ? "s" : ""} matched
+                </span>
+                <span className="text-mono-meta" style={{ color: "var(--color-outline)" }}>·</span>
+                <span className="text-mono-meta" style={{ color: "var(--color-secondary)", fontWeight: 500 }}>
+                  {results.ranking_method}
+                </span>
+              </div>
+
+              {/* Filename sorting dropdown */}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <label htmlFor="sort-select" className="text-label-sm" style={{ color: "var(--color-outline)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Sort:
+                </label>
+                <select
+                  id="sort-select"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as "relevance" | "name_asc" | "name_desc")}
+                  style={{
+                    background: "var(--color-surface-container-low)",
+                    color: "var(--color-on-surface)",
+                    border: "1px solid var(--color-outline-variant)",
+                    borderRadius: "var(--radius-xs)",
+                    padding: "3px 8px",
+                    fontSize: "0.75rem",
+                    fontFamily: "var(--font-mono)",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="name_asc">Filename A–Z</option>
+                  <option value="name_desc">Filename Z–A</option>
+                </select>
+              </div>
             </div>
 
             {results.total_results === 0 ? (
@@ -405,8 +639,21 @@ export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProp
                 </span>
               </div>
             ) : (
-              results.results.map((item, i) => (
-                <ResultCard key={item.doc_id} item={item} isFirst={i === 0} />
+              displayedResults.map((item, i) => (
+                <ResultCard
+                  key={item.doc_id}
+                  item={item}
+                  isFirst={i === 0}
+                  onOpen={() =>
+                    onViewDocument({
+                      id: item.doc_id,
+                      filename: item.filename,
+                      file_size: 0,
+                      token_count: 0,
+                      uploaded_at: "",
+                    })
+                  }
+                />
               ))
             )}
           </div>
@@ -485,6 +732,15 @@ export function SearchPage({ stats, recentDocs, onViewDocument }: SearchPageProp
                           </span>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px" }}>
                             <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>{doc.filename}</span>
+                            {doc.folder_name && (
+                              <>
+                                <span className="text-mono-meta" style={{ color: "color-mix(in srgb, var(--color-on-surface-variant) 40%, transparent)" }}>/</span>
+                                <span className="text-mono-meta" style={{ color: "var(--color-primary)", fontWeight: 500, display: "inline-flex", alignItems: "center", gap: "2px" }}>
+                                  <span className="icon" style={{ fontSize: "12px" }}>folder</span>
+                                  {doc.folder_name}
+                                </span>
+                              </>
+                            )}
                             <span className="text-mono-meta" style={{ color: "color-mix(in srgb, var(--color-on-surface-variant) 40%, transparent)" }}>·</span>
                             <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>{formatFileSize(doc.file_size)}</span>
                           </div>

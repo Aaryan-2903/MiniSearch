@@ -24,7 +24,7 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from app.db.database import init_db  # noqa: E402
-from app.api import health, documents, search, index  # noqa: E402
+from app.api import health, documents, search, index, folders  # noqa: E402
 
 
 @asynccontextmanager
@@ -48,6 +48,7 @@ app = FastAPI(
 # Add allowed origins here as the app is deployed to new environments.
 ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite dev server (local development)
+    "http://127.0.0.1:5173",  # Vite dev server alternative local URL
     # "https://your-production-domain.com",  # Add production URL when deploying
 ]
 
@@ -62,5 +63,6 @@ app.add_middleware(
 # ── Register routers ───────────────────────────────────────────────────────────
 app.include_router(health.router)
 app.include_router(documents.router)
+app.include_router(folders.router)
 app.include_router(search.router)
 app.include_router(index.router)

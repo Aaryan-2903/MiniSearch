@@ -221,3 +221,105 @@ def test_score_is_positive_float(client):
     for res in results:
         assert isinstance(res["score"], float)
         assert res["score"] > 0
+
+
+# ── Match Mode (Any term vs All terms) ─────────────────────────────────────────
+
+def test_default_match_mode_is_any(client):
+    """When match_mode is omitted, default behavior remains any-term (OR)."""
+    upload_txt(client, "doc_py.txt", "Python programming language.")
+    upload_txt(client, "doc_db.txt", "Relational database systems.")
+
+    r = client.post("/search", json={"query": "python database"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["match_mode"] == "any"
+    assert body["total_results"] == 2
+
+
+def test_match_mode_any_explicit(client):
+    """Explicit match_mode='any' returns documents matching either term."""
+    upload_txt(client, "doc1.txt", "Python is interpreted.")
+    upload_txt(client, "doc2.txt", "Java is compiled.")
+
+    r = search(client, "python java", match_mode="any")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["match_mode"] == "any"
+    assert body["total_results"] == 2
+    filenames = {res["filename"] for res in body["results"]}
+    assert "doc1.txt" in filenames
+    assert "doc2.txt" in filenames
+
+
+def test_match_mode_all_requires_every_term(client):
+    """match_mode='all' excludes documents that do not contain every query term."""
+    upload_txt(client, "doc_both.txt", "Python and database working together.")
+    upload_txt(client, "doc_only_py.txt", "Python without any storage.")
+    upload_txt(client, "doc_only_db.txt", "Database without any scripting.")
+
+    r = search(client, "python database", match_mode="all")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["match_mode"] == "all"
+    assert body["total_results"] == 1
+    assert body["results"][0]["filename"] == "doc_both.txt"
+    assert set(body["results"][0]["matched_terms"]) == {"python", "database"}
+
+
+def test_match_mode_all_no_document_matching_every_term(client):
+    """When no single document contains every term, match_mode='all' returns empty results."""
+    upload_txt(client, "only_a.txt", "Python programming scripts.")
+    upload_txt(client, "only_b.txt", "Database query optimization.")
+
+    r = search(client, "python database", match_mode="all")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["match_mode"] == "all"
+    assert body["total_results"] == 0
+    assert body["results"] == []
+
+
+# ── TF-IDF Explanation & Search Metadata ──────────────────────────────────────
+
+def test_tfidf_explanation_contains_real_values(client):
+    """Results must contain real explanation metrics from the backend."""
+    upload_txt(client, "doc_calc.txt", "Python python programming language.")
+    upload_txt(client, "doc_other.txt", "Language syntax grammar.")
+
+    r = search(client, "python programming")
+    assert r.status_code == 200
+    results = r.json()["results"]
+    assert len(results) >= 1
+
+    item = next(res for res in results if res["filename"] == "doc_calc.txt")
+    exp = item["explanation"]
+    assert exp is not None
+    assert exp["total_documents"] == 2
+    assert exp["query_terms_count"] == 2
+    assert exp["matched_terms_count"] == 2
+
+    # Check term details
+    terms = {t["term"]: t for t in exp["term_details"]}
+    assert "python" in terms
+    assert "programming" in terms
+    assert terms["python"]["tf"] == 2
+    assert terms["python"]["df"] == 1
+    assert terms["python"]["idf"] > 0
+    assert terms["python"]["tfidf"] > 0
+    assert terms["programming"]["tf"] == 1
+    assert terms["programming"]["df"] == 1
+
+
+def test_search_metadata_fields(client):
+    """Search response includes execution_time_ms, query_terms_count, and ranking_method."""
+    upload_txt(client, "meta_doc.txt", "Search metadata test document.")
+
+    r = search(client, "metadata test")
+    assert r.status_code == 200
+    body = r.json()
+    assert "execution_time_ms" in body
+    assert isinstance(body["execution_time_ms"], (int, float))
+    assert body["query_terms_count"] == 2
+    assert body["ranking_method"] == "TF-IDF"
+

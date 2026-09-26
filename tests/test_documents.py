@@ -9,7 +9,11 @@ Validates requirements 1–4 and 9:
   9.  Deleting a document removes its postings from the inverted index.
 """
 
+import os
 from tests.conftest import upload_txt, search
+from app.db import crud
+
+
 
 
 # ── Listing ────────────────────────────────────────────────────────────────────
@@ -166,8 +170,48 @@ def test_delete_removes_postings_from_index(client):
     # Delete it.
     client.delete(f"/documents/{doc_id}")
 
-    # Must not appear in search results afterwards.
     results_after = search(client, unique_term).json()["results"]
     assert all(r["doc_id"] != doc_id for r in results_after), \
         "Deleted document must not appear in search results"
     assert len(results_after) == 0
+
+
+# ── Retrieval ──────────────────────────────────────────────────────────────────
+
+def test_get_document_success(client):
+    """Retrieving a valid document returns metadata and exact content."""
+    content = "This is a test document for retrieval."
+    r_upload = upload_txt(client, "retrieve.txt", content)
+    doc_id = r_upload.json()["id"]
+
+    r_get = client.get(f"/documents/{doc_id}")
+    assert r_get.status_code == 200
+    doc = r_get.json()
+    assert doc["id"] == doc_id
+    assert doc["filename"] == "retrieve.txt"
+    assert doc["content"] == content
+
+
+def test_get_document_not_found(client):
+    """Retrieving a nonexistent document ID returns 404."""
+    r = client.get("/documents/99999")
+    assert r.status_code == 404
+    assert "detail" in r.json()
+
+
+def test_get_document_missing_file(client):
+    """If DB record exists but file is missing, return appropriate error (500)."""
+    content = "This file will be deleted from disk."
+    r_upload = upload_txt(client, "missing.txt", content)
+    doc_id = r_upload.json()["id"]
+
+    # Manually remove the file from disk using the actual path in the DB
+    doc_db = crud.get_document_by_id(doc_id)
+    filepath = doc_db["filepath"]
+    if os.path.exists(filepath):
+        os.remove(filepath)
+
+    r_get = client.get(f"/documents/{doc_id}")
+    assert r_get.status_code == 500
+    assert "missing from disk" in r_get.json()["detail"]
+

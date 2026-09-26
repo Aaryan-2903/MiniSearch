@@ -671,3 +671,88 @@ kbd {
 }
 .quick-filter .hash { color: color-mix(in srgb, var(--color-on-surface-variant) 60%, transparent); }
 .quick-filter:hover .hash { color: var(--color-primary); }
+
+/* ── Folder card & grid ── */
+.folder-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md);
+}
+.folder-card {
+  background: var(--color-surface-container-low);
+  border: 1px solid var(--color-surface-container);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.folder-card:hover {
+  background: var(--color-surface-container);
+  border-color: var(--color-outline-variant);
+}
+
+/* ── Action menu dropdown ── */
+.action-menu-container {
+  position: relative;
+  display: inline-block;
+}
+.action-menu-dropdown {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--color-surface-container-lowest);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-sm);
+  padding: 4px 0;
+  min-width: 140px;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 0.8125rem;
+  color: var(--color-on-surface);
+  cursor: pointer;
+  transition: background 120ms;
+}
+.action-menu-item:hover {
+  background: var(--color-surface-container);
+}
+.action-menu-item.danger {
+  color: var(--color-error);
+}
+.action-menu-item.danger:hover {
+  background: var(--color-error-container);
+}
+
+/* ── Destination radio item ── */
+.destination-radio-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--color-surface-container-low);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms, border-color 120ms;
+}
+.destination-radio-item:hover {
+  background: var(--color-surface-container);
+}
+.destination-radio-item.selected {
+  background: var(--color-surface-container-lowest);
+  border-color: var(--color-primary);
+}

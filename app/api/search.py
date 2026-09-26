@@ -26,4 +26,10 @@ def search(request: SearchRequest):
     if not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty.")
 
-    return search_service.search(request.query, request.top_k)
+    match_mode = request.match_mode.value if hasattr(request.match_mode, "value") else str(request.match_mode)
+    return search_service.search(
+        request.query,
+        request.top_k,
+        match_mode=match_mode,
+        folder_id=request.folder_id,
+    )

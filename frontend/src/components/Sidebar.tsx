@@ -36,12 +36,11 @@ export function Sidebar({ activePage, onNavigate, onAddDocuments, stats }: Sideb
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-            <span
-              className="icon"
-              style={{ fontSize: "20px", color: "var(--color-primary)", fontVariationSettings: '"FILL" 1' }}
-            >
-              manage_search
-            </span>
+            <img 
+              src="/favicon.svg" 
+              alt="MiniSearch Logo" 
+              style={{ width: "24px", height: "24px", borderRadius: "4px" }} 
+            />
             <span className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>
               MiniSearch
             </span>

@@ -23,6 +23,7 @@ def compute_tfidf_scores(
     query_terms: List[str],
     postings: Dict[str, list],
     total_documents: int,
+    match_mode: str = "any",
 ) -> List[dict]:
     """
     Rank documents using TF-IDF for a set of query terms.
@@ -32,6 +33,7 @@ def compute_tfidf_scores(
         postings:        { term: [ {"doc_id": int, "tf": int, "positions": [...]}, ... ] }
                          (fetched from DB for only the terms present in the query)
         total_documents: Total number of documents in the corpus (N).
+        match_mode:      "any" (OR semantics) or "all" (AND semantics).
 
     Returns:
         List of result dicts sorted by score descending:
@@ -41,6 +43,12 @@ def compute_tfidf_scores(
                 "score": float,
                 "matched_terms": [str, ...],
                 "positions": { term: [char_offset, ...] },
+                "explanation": {
+                    "total_documents": int,
+                    "query_terms_count": int,
+                    "matched_terms_count": int,
+                    "term_details": [ { term, tf, df, idf, tfidf }, ... ],
+                },
             },
             ...
         ]
@@ -48,9 +56,16 @@ def compute_tfidf_scores(
     if total_documents == 0 or not postings:
         return []
 
+    unique_query_terms = sorted(list(set(query_terms)))
+
+    # In "all" mode, if any query term has no postings at all, no document can match all terms.
+    if match_mode == "all" and any(term not in postings for term in unique_query_terms):
+        return []
+
     doc_scores: Dict[int, float] = {}
     doc_matched_terms: Dict[int, set] = {}
     doc_positions: Dict[int, dict] = {}
+    doc_term_details: Dict[int, list] = {}
 
     for term, posting_list in postings.items():
         df = len(posting_list)                              # document frequency
@@ -64,16 +79,34 @@ def compute_tfidf_scores(
             doc_scores[doc_id] = doc_scores.get(doc_id, 0.0) + tfidf
             doc_matched_terms.setdefault(doc_id, set()).add(term)
             doc_positions.setdefault(doc_id, {})[term] = entry["positions"]
+            doc_term_details.setdefault(doc_id, []).append({
+                "term": term,
+                "tf": tf,
+                "df": df,
+                "idf": round(idf, 4),
+                "tfidf": round(tfidf, 4),
+            })
 
-    results = [
-        {
+    results = []
+    for doc_id, score in doc_scores.items():
+        matched = doc_matched_terms[doc_id]
+
+        # For "all" mode, exclude documents that don't contain every query term.
+        if match_mode == "all" and len(matched) < len(unique_query_terms):
+            continue
+
+        results.append({
             "doc_id": doc_id,
             "score": round(score, 4),
-            "matched_terms": sorted(doc_matched_terms[doc_id]),
+            "matched_terms": sorted(matched),
             "positions": doc_positions[doc_id],
-        }
-        for doc_id, score in doc_scores.items()
-    ]
+            "explanation": {
+                "total_documents": total_documents,
+                "query_terms_count": len(unique_query_terms),
+                "matched_terms_count": len(matched),
+                "term_details": sorted(doc_term_details.get(doc_id, []), key=lambda t: t["term"]),
+            },
+        })
 
     # Primary key: score descending.
     # Secondary key: doc_id ascending — makes tie-breaking deterministic so that

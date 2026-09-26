@@ -44,6 +44,6 @@ def upload_txt(client: TestClient, filename: str, content: str) -> "requests.Res
     )
 
 
-def search(client: TestClient, query: str, top_k: int = 10) -> "requests.Response":
+def search(client: TestClient, query: str, top_k: int = 10, match_mode: str = "any") -> "requests.Response":
     """POST /search and return the raw Response object."""
-    return client.post("/search", json={"query": query, "top_k": top_k})
+    return client.post("/search", json={"query": query, "top_k": top_k, "match_mode": match_mode})

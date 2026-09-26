@@ -11,6 +11,14 @@ from typing import List, Optional
 
 
 @dataclass
+class Folder:
+    id: int
+    name: str
+    created_at: str
+    document_count: int = 0
+
+
+@dataclass
 class Document:
     id: int
     filename: str
@@ -18,6 +26,8 @@ class Document:
     file_size: int
     token_count: int
     uploaded_at: str
+    folder_id: Optional[int] = None
+    folder_name: Optional[str] = None
 
 
 @dataclass

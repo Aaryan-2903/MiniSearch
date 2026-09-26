@@ -19,19 +19,22 @@ import { DocumentsPage } from "./pages/DocumentsPage";
 import { IndexPage } from "./pages/IndexPage";
 import { DocumentViewPage } from "./pages/DocumentViewPage";
 import { api } from "./lib/api";
-import type { DocFile, IndexStats } from "./lib/api";
+import type { DocFile, IndexStats, Folder } from "./lib/api";
 
 type Page = "search" | "documents" | "index" | "settings";
 
 export default function App() {
   const [activePage, setActivePage] = useState<Page>("search");
   const [showUpload, setShowUpload] = useState(false);
+  const [uploadFolderId, setUploadFolderId] = useState<number | null>(null);
   const [viewingDoc, setViewingDoc] = useState<DocFile | null>(null);
 
   // Global data
   const [documents, setDocuments] = useState<DocFile[]>([]);
   const [docsLoading, setDocsLoading] = useState(true);
   const [docsError, setDocsError] = useState<string | null>(null);
+
+  const [folders, setFolders] = useState<Folder[]>([]);
 
   const [stats, setStats] = useState<IndexStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -50,6 +53,15 @@ export default function App() {
     }
   }, []);
 
+  const fetchFolders = useCallback(async () => {
+    try {
+      const res = await api.listFolders();
+      setFolders(res.folders);
+    } catch {
+      // keep existing folders on error
+    }
+  }, []);
+
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
     setStatsError(null);
@@ -63,14 +75,15 @@ export default function App() {
     }
   }, []);
 
-  function refreshAll() {
+  const refreshAll = useCallback(() => {
     fetchDocuments();
+    fetchFolders();
     fetchStats();
-  }
+  }, [fetchDocuments, fetchFolders, fetchStats]);
 
   useEffect(() => {
     refreshAll();
-  }, []);
+  }, [refreshAll]);
 
   function handleUploaded() {
     refreshAll();
@@ -101,7 +114,10 @@ export default function App() {
       <Sidebar
         activePage={activePage}
         onNavigate={handleNavigate}
-        onAddDocuments={() => setShowUpload(true)}
+        onAddDocuments={() => {
+          setUploadFolderId(null);
+          setShowUpload(true);
+        }}
         stats={stats}
       />
 
@@ -124,15 +140,20 @@ export default function App() {
             <SearchPage
               stats={stats}
               recentDocs={recentDocs}
+              folders={folders}
               onViewDocument={handleViewDocument}
             />
           ) : activePage === "documents" ? (
             <DocumentsPage
               documents={documents}
+              folders={folders}
               loading={docsLoading}
               error={docsError}
               totalTerms={stats?.total_unique_terms ?? 0}
-              onAddDocuments={() => setShowUpload(true)}
+              onAddDocuments={(folderId?: number | null) => {
+                setUploadFolderId(folderId ?? null);
+                setShowUpload(true);
+              }}
               onRefresh={refreshAll}
               onViewDocument={handleViewDocument}
             />
@@ -157,6 +178,8 @@ export default function App() {
 
       {showUpload && (
         <UploadModal
+          folders={folders}
+          defaultFolderId={uploadFolderId}
           onClose={() => setShowUpload(false)}
           onUploaded={handleUploaded}
         />
@@ -164,3 +187,4 @@ export default function App() {
     </>
   );
 }
+
