@@ -683,4 +683,4 @@ The core implementation of MiniSearch is complete, fully tested, and stable:
 
 ## License
 
-This project was developed for academic coursework, technical demonstration, and project evaluation. Code is provided for review, testing, and educational purposes.
+MiniSearch is licensed under the [MIT License](LICENSE).
