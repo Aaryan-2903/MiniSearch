@@ -185,6 +185,14 @@ flowchart TD
 
 ---
 
+## Document Indexing Pipeline
+
+MiniSearch processes uploaded text documents before making them searchable. Documents pass through text preprocessing, tokenization, stopword filtering, and finally become part of the inverted index.
+
+![MiniSearch Document Indexing Pipeline](docs/images/minisearch-document-flow.png)
+
+---
+
 ## Inverted Index
 
 An inverted index is a foundational data structure in information retrieval. Instead of scanning every document sequentially to locate a query word (forward search), the inverted index maps each unique vocabulary term to a **postings list** of documents where that term occurs.
