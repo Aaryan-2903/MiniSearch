@@ -77,33 +77,6 @@ export function IndexPage({
                 : "Configuration and search pipeline processing parameters."}
             </p>
           </div>
-
-          {stats && (
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                padding: "3px 8px",
-                borderRadius: "var(--radius-xs)",
-                background: "var(--color-surface-container-low)",
-                border: "1px solid var(--color-outline-variant)",
-                color: "var(--color-on-surface-variant)",
-              }}
-            >
-              <span
-                style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-outline)",
-                }}
-              />
-              <span className="text-mono-meta">
-                {stats.index_status === "ready" ? "Index ready" : stats.index_status}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Tab navigation */}
@@ -170,7 +143,7 @@ export function IndexPage({
                       <span style={{ fontFamily: "var(--font-mono)", fontSize: "1.5rem", fontWeight: 600, color: "var(--color-on-surface)" }}>
                         {stats.total_unique_terms.toLocaleString()}
                       </span>
-                      <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>postings</span>
+                      <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>terms</span>
                     </div>
                   </div>
 

@@ -396,7 +396,7 @@ export function SearchPage({ stats, recentDocs, folders = [], onViewDocument }: 
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
       {/* Main content area */}
-      <div style={{ width: "100%", maxWidth: "720px", margin: "0 auto", padding: "2.5rem var(--space-lg) 4rem", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: "100%", maxWidth: "900px", margin: "0 auto", padding: "2.5rem var(--space-lg) 4rem", display: "flex", flexDirection: "column" }}>
         {/* Heading */}
         <div style={{ display: "flex", flexDirection: "column", marginBottom: "1.5rem" }}>
           <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>
