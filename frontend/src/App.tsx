@@ -163,6 +163,8 @@ export default function App() {
               loading={statsLoading}
               error={statsError}
               onRefresh={fetchStats}
+              initialTab="index"
+              totalSize={documents.reduce((s, d) => s + d.file_size, 0)}
             />
           ) : activePage === "settings" ? (
             // Settings routes to the Index page settings tab
@@ -171,6 +173,8 @@ export default function App() {
               loading={statsLoading}
               error={statsError}
               onRefresh={fetchStats}
+              initialTab="settings"
+              totalSize={documents.reduce((s, d) => s + d.file_size, 0)}
             />
           ) : null}
         </main>

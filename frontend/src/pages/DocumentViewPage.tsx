@@ -1,8 +1,11 @@
 /**
  * DocumentViewPage.tsx
  * --------------------
- * Simple document detail view: shows metadata and the ability to delete.
- * Accessible from Search results or Documents table.
+ * Document reading workspace:
+ * - Editorial typography with readable line-height and comfortable text width
+ * - Path and document metadata
+ * - Restrained actions (Download TXT/PDF, Delete) near document header
+ * - Text-reading workspace (not a code editor)
  */
 
 import type { DocFile, DocDetail } from "../lib/api";
@@ -62,41 +65,55 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
     }
   }
 
+  const documentPath = doc.folder_name ? `${doc.folder_name} / ${doc.filename}` : doc.filename;
+
   return (
-    <div style={{ padding: "var(--space-xl)", maxWidth: "760px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: "var(--space-xl)" }}>
+    <div style={{ padding: "2rem var(--space-xl)", maxWidth: "760px", width: "100%", margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       {/* Back button */}
       <button
         className="btn-ghost"
         onClick={onBack}
-        style={{ alignSelf: "flex-start", display: "flex", alignItems: "center", gap: "4px" }}
+        style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: "6px" }}
       >
         <span className="icon" style={{ fontSize: "16px" }}>arrow_back</span>
-        Back
+        <span>Documents</span>
       </button>
 
       {/* Document header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-md)", flexWrap: "wrap" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-            <span className="icon" style={{ fontSize: "20px", color: "var(--color-primary)" }}>description</span>
-            <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>
-              {doc.filename}
-            </h1>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-md)", flexWrap: "wrap", borderBottom: "1px solid var(--color-outline-variant)", paddingBottom: "1.25rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", minWidth: 0 }}>
+          {/* Path hierarchy */}
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span className="icon" style={{ fontSize: "16px", color: "var(--color-primary)" }}>
+              {doc.folder_name ? "folder" : "description"}
+            </span>
+            <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+              {documentPath}
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", paddingLeft: "28px" }}>
+
+          <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>
+            {doc.filename}
+          </h1>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "2px" }}>
             <span className="indexed-pill">
               <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--color-secondary)", flexShrink: 0 }} />
               Indexed
             </span>
+            <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+              {formatFileSize(doc.file_size)} · {doc.token_count.toLocaleString()} tokens · Uploaded {formatDate(doc.uploaded_at)}
+            </span>
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        {/* Toolbar actions */}
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0, marginTop: "4px" }}>
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              background: "var(--color-surface-container-low)",
+              background: "var(--color-background)",
               border: "1px solid var(--color-outline-variant)",
               borderRadius: "var(--radius-sm)",
               overflow: "hidden",
@@ -107,7 +124,7 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
               onClick={() => handleDownload("txt")}
               disabled={downloadingFormat !== null}
               style={{
-                padding: "6px 10px",
+                padding: "5px 10px",
                 fontSize: "0.8125rem",
                 display: "inline-flex",
                 alignItems: "center",
@@ -126,7 +143,7 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
               onClick={() => handleDownload("pdf")}
               disabled={downloadingFormat !== null}
               style={{
-                padding: "6px 10px",
+                padding: "5px 10px",
                 fontSize: "0.8125rem",
                 display: "inline-flex",
                 alignItems: "center",
@@ -156,85 +173,44 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
         </div>
       </div>
 
-      {/* Metadata grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-md)" }}>
-        {[
-          { label: "Document ID", value: `#${doc.id}` },
-          { label: "File Size", value: formatFileSize(doc.file_size) },
-          { label: "Token Count", value: doc.token_count.toLocaleString() },
-          { label: "Uploaded", value: formatDate(doc.uploaded_at) },
-        ].map((item) => (
-          <div
-            key={item.label}
-            style={{
-              background: "var(--color-surface-container-low)",
-              borderRadius: "var(--radius-sm)",
-              padding: "var(--space-md)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "4px",
-            }}
-          >
-            <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
-              {item.label}
-            </span>
-            <span
-              className="text-mono-meta"
-              style={{ color: "var(--color-on-surface)", fontWeight: 500, fontSize: "0.875rem" }}
-            >
-              {item.value}
-            </span>
-          </div>
-        ))}
-      </div>
+      {/* Document Content Workspace */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span className="text-label-sm" style={{ color: "var(--color-on-surface-variant)" }}>
+            Document Body
+          </span>
+          <span className="text-mono-meta" style={{ color: "var(--color-outline)" }}>
+            UTF-8 Text
+          </span>
+        </div>
 
-      {/* Info note */}
-      <div
-        style={{
-          background: "var(--color-surface-container-low)",
-          borderRadius: "var(--radius-sm)",
-          padding: "var(--space-md)",
-          display: "flex",
-          alignItems: "flex-start",
-          gap: "var(--space-sm)",
-        }}
-      >
-        <span className="icon" style={{ fontSize: "16px", color: "var(--color-outline)", flexShrink: 0, marginTop: "2px" }}>info</span>
-        <span className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>
-          Document content is stored on disk. The inverted index maps tokenised terms from this file
-          to their positions for fast TF-IDF ranked retrieval. Deleting this document also removes its
-          postings from the index.
-        </span>
-      </div>
-
-      {/* Document Content */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
-        <h2 className="text-title-md" style={{ color: "var(--color-on-surface)" }}>Content</h2>
         {loading ? (
-          <div style={{ padding: "var(--space-md)", color: "var(--color-outline)" }}>Loading content...</div>
+          <div style={{ padding: "var(--space-xl)", textAlign: "center", color: "var(--color-outline)" }}>
+            <span className="icon spin" style={{ fontSize: "20px" }}>refresh</span>
+            <div className="text-body-sm" style={{ marginTop: "6px" }}>Loading content...</div>
+          </div>
         ) : error ? (
-          <div style={{ padding: "var(--space-md)", color: "var(--color-error)", background: "var(--color-error-container)", borderRadius: "var(--radius-sm)" }}>
+          <div style={{ padding: "var(--space-md)", color: "var(--color-error)", background: "var(--color-error-container)", borderRadius: "var(--radius-sm)", border: "1px solid var(--color-error)" }}>
             Error loading content: {error}
           </div>
         ) : detail ? (
-          <pre
+          <div
             style={{
-              background: "var(--color-surface-container-low)",
-              padding: "var(--space-md)",
+              background: "var(--color-background)",
+              padding: "1.5rem",
               borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--color-outline-variant)",
+              fontSize: "0.9375rem",
+              lineHeight: 1.65,
+              color: "var(--color-on-surface)",
               whiteSpace: "pre-wrap",
               wordBreak: "break-word",
-              maxHeight: "500px",
+              maxHeight: "650px",
               overflowY: "auto",
-              fontFamily: "var(--font-mono)",
-              fontSize: "0.875rem",
-              lineHeight: 1.5,
-              color: "var(--color-on-surface)",
-              border: "1px solid var(--color-outline-variant)"
             }}
           >
             {detail.content}
-          </pre>
+          </div>
         ) : null}
       </div>
     </div>

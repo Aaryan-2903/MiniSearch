@@ -1,26 +1,43 @@
 /**
  * IndexPage.tsx
  * -------------
- * Two-tab view: "Inverted Index" (stats + rebuild) and "Settings" (read-only display
- * of actual backend capabilities — no fake toggles).
+ * Search Index Diagnostics & Engine Settings.
+ * Technical diagnostic/index information page:
+ * - Real-time inverted index stats (documents, unique terms, storage size, status)
+ * - Index architecture details and postings format
+ * - Index rebuild tool with immediate feedback
+ * - Settings tab with clean configuration rows and subtle dividers
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { IndexStats } from "../lib/api";
 import { api } from "../lib/api";
-import { formatDate } from "../lib/utils";
+import { formatDate, formatFileSize } from "../lib/utils";
 
 interface IndexPageProps {
   stats: IndexStats | null;
   loading: boolean;
   error: string | null;
   onRefresh: () => void;
+  initialTab?: "index" | "settings";
+  totalSize?: number;
 }
 
-export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) {
-  const [activeTab, setActiveTab] = useState<"index" | "settings">("index");
+export function IndexPage({
+  stats,
+  loading,
+  error,
+  onRefresh,
+  initialTab = "index",
+  totalSize,
+}: IndexPageProps) {
+  const [activeTab, setActiveTab] = useState<"index" | "settings">(initialTab);
   const [rebuilding, setRebuilding] = useState(false);
   const [rebuildResult, setRebuildResult] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
 
   async function handleRebuild() {
     if (rebuilding) return;
@@ -41,66 +58,86 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-      {/* Page header with tabs */}
+      {/* Header with Title and Tabs */}
       <div
         style={{
-          background: "var(--color-surface-container-low)",
-          padding: "var(--space-lg) var(--space-xl) 0",
+          background: "var(--color-background)",
+          padding: "1.75rem var(--space-xl) 0",
           borderBottom: "1px solid var(--color-outline-variant)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <span className="text-mono-meta" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-on-surface-variant)" }}>
-              Engine Diagnostic
-            </span>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "var(--space-md)" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>
-              Search Index &amp; Engine Settings
+              {activeTab === "index" ? "Search Index" : "Engine Settings"}
             </h1>
+            <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>
+              {activeTab === "index"
+                ? "Diagnostic health, term postings, and inverted index state."
+                : "Configuration and search pipeline processing parameters."}
+            </p>
           </div>
+
           {stats && (
             <div
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "4px 8px",
+                padding: "3px 8px",
                 borderRadius: "var(--radius-xs)",
-                background: "var(--color-surface-container)",
+                background: "var(--color-surface-container-low)",
+                border: "1px solid var(--color-outline-variant)",
                 color: "var(--color-on-surface-variant)",
               }}
             >
-              <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-outline)" }} />
-              <span className="text-mono-meta">{stats.index_status === "ready" ? "Index ready" : stats.index_status}</span>
+              <span
+                style={{
+                  width: "6px",
+                  height: "6px",
+                  borderRadius: "50%",
+                  background: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-outline)",
+                }}
+              />
+              <span className="text-mono-meta">
+                {stats.index_status === "ready" ? "Index ready" : stats.index_status}
+              </span>
             </div>
           )}
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-lg)", marginTop: "var(--space-lg)" }}>
-          <button className={`tab-btn${activeTab === "index" ? " active" : ""}`} onClick={() => setActiveTab("index")}>
+        {/* Tab navigation */}
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-lg)", marginTop: "1.25rem" }}>
+          <button
+            className={`tab-btn${activeTab === "index" ? " active" : ""}`}
+            onClick={() => setActiveTab("index")}
+          >
             <span className="icon" style={{ fontSize: "16px" }}>account_tree</span>
             <span>Inverted Index</span>
           </button>
-          <button className={`tab-btn${activeTab === "settings" ? " active" : ""}`} onClick={() => setActiveTab("settings")}>
+          <button
+            className={`tab-btn${activeTab === "settings" ? " active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+          >
             <span className="icon" style={{ fontSize: "16px" }}>tune</span>
-            <span>Engine Settings</span>
+            <span>Engine Configuration</span>
           </button>
         </div>
       </div>
 
-      <div style={{ padding: "var(--space-xl)", display: "flex", flexDirection: "column", gap: "var(--space-xl)", maxWidth: "1100px", width: "100%" }}>
-        {/* Loading */}
+      {/* Content Area */}
+      <div style={{ padding: "1.75rem var(--space-xl)", maxWidth: "860px", width: "100%", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        {/* Loading state */}
         {loading && (
           <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}>
-            <span className="icon spin" style={{ fontSize: "24px", color: "var(--color-on-surface-variant)" }}>refresh</span>
+            <span className="icon spin" style={{ fontSize: "22px", color: "var(--color-on-surface-variant)" }}>refresh</span>
           </div>
         )}
 
-        {/* Error */}
+        {/* Error state */}
         {error && !loading && (
           <div className="error-state">
-            <span className="icon" style={{ fontSize: "32px", color: "var(--color-error)" }}>error</span>
+            <span className="icon" style={{ fontSize: "28px", color: "var(--color-error)" }}>error</span>
             <span className="text-body-md" style={{ color: "var(--color-on-surface-variant)" }}>{error}</span>
             <button className="btn-ghost" onClick={onRefresh}>Retry</button>
           </div>
@@ -108,90 +145,66 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
 
         {!loading && !error && stats && (
           <>
-            {/* ── TAB 1: Inverted Index ── */}
+            {/* ── TAB 1: Inverted Index Diagnostics ── */}
             {activeTab === "index" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-xl)" }}>
-                {/* Stat cells */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-sm)" }}>
-                  <div
-                    style={{
-                      padding: "var(--space-lg)",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-outline-variant)",
-                      background: "var(--color-surface-container-lowest)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Compact Technical Metrics */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "10px" }}>
+                  <div className="stat-cell">
+                    <span className="text-label-sm" style={{ color: "var(--color-outline)" }}>
                       Documents Indexed
                     </span>
-                    <div style={{ marginTop: "var(--space-md)", display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-                      <span
-                        style={{ fontFamily: "var(--font-mono)", fontSize: "1.75rem", fontWeight: 600, lineHeight: "2.25rem", color: "var(--color-on-surface)" }}
-                      >
+                    <div style={{ marginTop: "10px", display: "flex", alignItems: "baseline", gap: "6px" }}>
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: "1.5rem", fontWeight: 600, color: "var(--color-on-surface)" }}>
                         {stats.total_documents}
                       </span>
-                      <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>.txt sources</span>
+                      <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>.txt files</span>
                     </div>
-                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "var(--space-xs)" }}>
-                      {stats.total_documents > 0 ? "100% corpus ingested" : "No documents"}
-                    </span>
                   </div>
 
-                  <div
-                    style={{
-                      padding: "var(--space-lg)",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-outline-variant)",
-                      background: "var(--color-surface-container-lowest)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
+                  <div className="stat-cell">
+                    <span className="text-label-sm" style={{ color: "var(--color-outline)" }}>
                       Unique Terms
                     </span>
-                    <div style={{ marginTop: "var(--space-md)", display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-                      <span
-                        style={{ fontFamily: "var(--font-mono)", fontSize: "1.75rem", fontWeight: 600, lineHeight: "2.25rem", color: "var(--color-on-surface)" }}
-                      >
+                    <div style={{ marginTop: "10px", display: "flex", alignItems: "baseline", gap: "6px" }}>
+                      <span style={{ fontFamily: "var(--font-mono)", fontSize: "1.5rem", fontWeight: 600, color: "var(--color-on-surface)" }}>
                         {stats.total_unique_terms.toLocaleString()}
                       </span>
                       <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>postings</span>
                     </div>
-                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "var(--space-xs)" }}>
-                      {stats.total_documents > 0
-                        ? `Avg ${Math.round(stats.total_unique_terms / stats.total_documents).toLocaleString()} terms / doc`
-                        : "—"}
-                    </span>
                   </div>
 
-                  <div
-                    style={{
-                      padding: "var(--space-lg)",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-outline-variant)",
-                      background: "var(--color-surface-container-lowest)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
+                  {totalSize !== undefined && (
+                    <div className="stat-cell">
+                      <span className="text-label-sm" style={{ color: "var(--color-outline)" }}>
+                        Storage Size
+                      </span>
+                      <div style={{ marginTop: "10px", display: "flex", alignItems: "baseline", gap: "6px" }}>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: "1.5rem", fontWeight: 600, color: "var(--color-on-surface)" }}>
+                          {formatFileSize(totalSize)}
+                        </span>
+                        <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>on disk</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="stat-cell">
+                    <span className="text-label-sm" style={{ color: "var(--color-outline)" }}>
                       Index Status
                     </span>
-                    <div style={{ marginTop: "var(--space-md)", display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                      <span style={{
-                        width: "8px", height: "8px", borderRadius: "50%",
-                        background: stats.index_status === "ready" ? "var(--color-secondary)" : stats.index_status === "building" ? "var(--color-tertiary)" : "var(--color-outline)",
-                      }} />
+                    <div style={{ marginTop: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span
+                        style={{
+                          width: "7px",
+                          height: "7px",
+                          borderRadius: "50%",
+                          background: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-outline)",
+                        }}
+                      />
                       <span
                         style={{
                           fontFamily: "var(--font-mono)",
-                          fontSize: "1.25rem",
+                          fontSize: "1.1rem",
                           fontWeight: 500,
                           color: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-on-surface)",
                           textTransform: "capitalize",
@@ -200,92 +213,75 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
                         {stats.index_status}
                       </span>
                     </div>
-                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "var(--space-xs)" }}>
-                      O(1) term lookup active
-                    </span>
                   </div>
 
-                  <div
-                    style={{
-                      padding: "var(--space-lg)",
-                      borderRadius: "var(--radius-sm)",
-                      border: "1px solid var(--color-outline-variant)",
-                      background: "var(--color-surface-container-lowest)",
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-outline)" }}>
+                  <div className="stat-cell">
+                    <span className="text-label-sm" style={{ color: "var(--color-outline)" }}>
                       Last Rebuilt
                     </span>
-                    <div style={{ marginTop: "var(--space-md)" }}>
-                      <span
-                        style={{ fontFamily: "var(--font-mono)", fontSize: "0.9375rem", fontWeight: 600, color: "var(--color-on-surface)" }}
-                      >
-                        {stats.last_built_at ? formatDate(stats.last_built_at) : "Never"}
+                    <div style={{ marginTop: "10px" }}>
+                      <span className="text-mono-meta" style={{ fontWeight: 500, color: "var(--color-on-surface)" }}>
+                        {stats.last_built_at ? formatDate(stats.last_built_at) : "Synchronous"}
                       </span>
                     </div>
-                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", marginTop: "var(--space-xs)" }}>
-                      Synchronous rebuild
-                    </span>
                   </div>
                 </div>
 
-                {/* Inverted index description */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-md)", background: "var(--color-surface-container-lowest)", borderRadius: "var(--radius-sm)" }}>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>Inverted index structure</h2>
-                    <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", marginTop: "2px" }}>
-                      Maps tokenized terms directly to document IDs and posting frequency offsets for O(1) term lookup.
-                      Tokens are preprocessed using lowercasing and stopword removal before insertion into the index.
-                    </p>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)" }}>
-                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>Postings Table Format:</span>
-                    <code
-                      style={{
-                        fontFamily: "var(--font-mono)",
-                        fontSize: "0.75rem",
-                        background: "var(--color-surface-container)",
-                        padding: "2px 6px",
-                        borderRadius: "var(--radius-xs)",
-                        color: "var(--color-on-surface)",
-                      }}
-                    >
-                      DocID:Freq
-                    </code>
-                  </div>
-                </div>
-
-                {/* Rebuild section */}
+                {/* Inverted Index Technical Architecture */}
                 <div
                   style={{
-                    padding: "var(--space-lg)",
-                    background: "var(--color-surface-container-low)",
-                    borderRadius: "var(--radius-sm)",
+                    background: "var(--color-background)",
                     border: "1px solid var(--color-outline-variant)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "1.25rem",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "var(--space-md)",
+                    gap: "10px",
                   }}
                 >
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>Index Management</h2>
+                  <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>
+                    Inverted Index Structure
+                  </h2>
+                  <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", lineHeight: 1.5 }}>
+                    The index tokenizes uploaded plaintext, applies lowercase folding and stopword filtering, and builds a postings table mapping each normalized token to document IDs and term occurrence frequencies. Query evaluation computes normalized term frequency (TF) and inverse document frequency (IDF) for deterministic cosine-like relevance ranking.
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                    <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
+                      Posting Format:
+                    </span>
+                    <code>DocID : TermFrequency</code>
+                  </div>
+                </div>
+
+                {/* Index Management / Rebuild */}
+                <div
+                  style={{
+                    background: "var(--color-surface-container-low)",
+                    border: "1px solid var(--color-outline-variant)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "1.25rem",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "12px",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                    <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>
+                      Index Rebuild
+                    </h2>
                     <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>
-                      Rebuild the inverted index from scratch by reprocessing every document currently in the corpus.
-                      Use this if the index is suspected to be inconsistent.
+                      Reprocess all documents in the database and regenerate inverted index postings table.
                     </p>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                  <div>
                     <button
                       className="btn-primary"
                       onClick={handleRebuild}
                       disabled={rebuilding}
-                      style={{ opacity: rebuilding ? 0.7 : 1, cursor: rebuilding ? "default" : "pointer" }}
+                      style={{ opacity: rebuilding ? 0.7 : 1 }}
                     >
-                      <span className={`icon${rebuilding ? " spin" : ""}`} style={{ fontSize: "14px" }}>refresh</span>
+                      <span className={`icon${rebuilding ? " spin" : ""}`} style={{ fontSize: "15px" }}>refresh</span>
                       <span>{rebuilding ? "Rebuilding..." : "Rebuild inverted index"}</span>
                     </button>
                   </div>
@@ -293,14 +289,22 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
                   {rebuildResult && (
                     <div className="rebuild-banner">
                       <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: rebuildResult.startsWith("Error") ? "var(--color-error)" : "var(--color-secondary)", flexShrink: 0 }} />
+                        <span
+                          style={{
+                            width: "6px",
+                            height: "6px",
+                            borderRadius: "50%",
+                            background: rebuildResult.startsWith("Error") ? "var(--color-error)" : "var(--color-secondary)",
+                            flexShrink: 0,
+                          }}
+                        />
                         {rebuildResult}
                       </span>
                       <button
                         className="btn-icon"
                         onClick={() => setRebuildResult(null)}
                       >
-                        <span className="icon" style={{ fontSize: "12px" }}>close</span>
+                        <span className="icon" style={{ fontSize: "14px" }}>close</span>
                       </button>
                     </div>
                   )}
@@ -308,22 +312,24 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
               </div>
             )}
 
-            {/* ── TAB 2: Settings (read-only display of real config) ── */}
+            {/* ── TAB 2: Engine Configuration (Read-only clean rows) ── */}
             {activeTab === "settings" && (
               <div
                 style={{
-                  background: "var(--color-surface-container-low)",
+                  background: "var(--color-background)",
+                  border: "1px solid var(--color-outline-variant)",
                   borderRadius: "var(--radius-sm)",
-                  padding: "var(--space-lg)",
+                  padding: "1.25rem 1.5rem",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "var(--space-lg)",
                 }}
               >
-                <div>
-                  <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>Engine Configuration</h2>
+                <div style={{ marginBottom: "1rem" }}>
+                  <h2 className="text-headline-sm" style={{ color: "var(--color-on-surface)" }}>
+                    Engine Configuration
+                  </h2>
                   <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", marginTop: "2px" }}>
-                    Read-only view of the current backend processing configuration.
+                    Read-only parameters of the active backend search engine and ranking pipeline.
                   </p>
                 </div>
 
@@ -368,23 +374,28 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
                         alignItems: "flex-start",
                         justifyContent: "space-between",
                         gap: "var(--space-md)",
-                        paddingTop: i === 0 ? 0 : "var(--space-md)",
-                        paddingBottom: i === arr.length - 1 ? 0 : "var(--space-md)",
-                        borderBottom: i < arr.length - 1 ? "1px solid color-mix(in srgb, var(--color-outline-variant) 30%, transparent)" : "none",
+                        paddingTop: "1rem",
+                        paddingBottom: "1rem",
+                        borderBottom: i < arr.length - 1 ? "1px solid var(--color-outline-variant)" : "none",
                       }}
                     >
                       <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-                        <span className="text-label-md" style={{ color: "var(--color-on-surface)", fontWeight: 500 }}>{row.label}</span>
-                        <span className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", marginTop: "2px" }}>{row.desc}</span>
+                        <span className="text-body-sm" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>
+                          {row.label}
+                        </span>
+                        <span className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", marginTop: "2px" }}>
+                          {row.desc}
+                        </span>
                       </div>
-                      <div style={{ flexShrink: 0, maxWidth: "280px", textAlign: "right" }}>
+                      <div style={{ flexShrink: 0, textAlign: "right" }}>
                         <span
                           className="text-mono-meta"
                           style={{
                             display: "inline-block",
-                            padding: "3px 10px",
+                            padding: "4px 8px",
                             borderRadius: "var(--radius-xs)",
-                            background: "var(--color-surface-container)",
+                            background: "var(--color-surface-container-low)",
+                            border: "1px solid var(--color-outline-variant)",
                             color: "var(--color-on-surface)",
                           }}
                         >
@@ -397,15 +408,6 @@ export function IndexPage({ stats, loading, error, onRefresh }: IndexPageProps) 
               </div>
             )}
           </>
-        )}
-
-        {/* Empty state when no stats */}
-        {!loading && !error && !stats && (
-          <div className="empty-state">
-            <span className="icon" style={{ fontSize: "32px", color: "var(--color-outline)" }}>database</span>
-            <span className="text-body-md" style={{ color: "var(--color-on-surface-variant)" }}>Index data unavailable.</span>
-            <button className="btn-ghost" onClick={onRefresh}>Refresh</button>
-          </div>
         )}
       </div>
     </div>

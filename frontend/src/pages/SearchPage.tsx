@@ -395,41 +395,15 @@ export function SearchPage({ stats, recentDocs, folders = [], onViewDocument }: 
 
   return (
     <div style={{ display: "flex", flexDirection: "column", width: "100%" }}>
-      {/* Breadcrumb bar */}
-      <div
-        style={{
-          background: "color-mix(in srgb, var(--color-surface-container-low) 60%, transparent)",
-          padding: "var(--space-sm) var(--space-xl)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid var(--color-outline-variant)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-          <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)", fontWeight: 500 }}>MiniSearch</span>
-          <span className="text-mono-meta" style={{ color: "color-mix(in srgb, var(--color-on-surface-variant) 40%, transparent)" }}>/</span>
-          <span className="text-mono-meta" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>Search Home</span>
-        </div>
-        {stats && (
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-outline)" }} />
-            <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
-              Index {stats.index_status}
-            </span>
-          </div>
-        )}
-      </div>
-
       {/* Main content area */}
-      <div style={{ width: "100%", maxWidth: "720px", margin: "0 auto", padding: "4rem var(--space-lg) 6rem", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: "100%", maxWidth: "720px", margin: "0 auto", padding: "2.5rem var(--space-lg) 4rem", display: "flex", flexDirection: "column" }}>
         {/* Heading */}
-        <div style={{ display: "flex", flexDirection: "column", marginBottom: "2rem" }}>
-          <h1 className="text-headline-lg" style={{ color: "var(--color-on-surface)", fontWeight: 600, letterSpacing: "-0.02em" }}>
+        <div style={{ display: "flex", flexDirection: "column", marginBottom: "1.5rem" }}>
+          <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)", fontWeight: 600 }}>
             Search your documents
           </h1>
           {stats && (
-            <p className="text-body-md" style={{ color: "var(--color-on-surface-variant)", marginTop: "6px" }}>
+            <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)", marginTop: "4px" }}>
               Search across {stats.total_documents} plain text file{stats.total_documents !== 1 ? "s" : ""} and {stats.total_unique_terms.toLocaleString()} inverted index terms.
             </p>
           )}

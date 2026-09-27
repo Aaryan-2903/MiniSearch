@@ -1,7 +1,8 @@
 /**
  * TopHeader.tsx
  * -------------
- * Fixed top header: breadcrumb navigation + index status indicator.
+ * Application top navigation bar: clean editorial text navigation
+ * with subtle separators and real-time index status indicator.
  */
 
 import type { IndexStats } from "../lib/api";
@@ -27,16 +28,12 @@ export function TopHeader({ activePage, onNavigate, stats }: TopHeaderProps) {
 
   return (
     <header className="top-header">
-      <nav style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
+      <nav className="top-nav">
         {pages.map((page, i) => (
-          <span key={page} style={{ display: "flex", alignItems: "center", gap: "var(--space-md)" }}>
-            {i > 0 && (
-              <span className="text-mono-meta" style={{ color: "var(--color-outline-variant)" }}>
-                /
-              </span>
-            )}
+          <span key={page} style={{ display: "inline-flex", alignItems: "center" }}>
+            {i > 0 && <span className="top-nav-sep" style={{ margin: "0 6px" }}>/</span>}
             <button
-              className={`breadcrumb-item${activePage === page ? " active" : ""}`}
+              className={`top-nav-link${activePage === page ? " active" : ""}`}
               onClick={() => onNavigate(page)}
             >
               {PAGE_LABELS[page]}
@@ -46,10 +43,9 @@ export function TopHeader({ activePage, onNavigate, stats }: TopHeaderProps) {
       </nav>
 
       {stats && (
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span
             className={`status-dot ${statusColor(stats.index_status)}`}
-            style={{ background: stats.index_status === "ready" ? "var(--color-secondary)" : "var(--color-outline)" }}
           />
           <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
             Index {stats.index_status}

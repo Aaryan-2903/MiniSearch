@@ -32,7 +32,7 @@ export function DocumentsPage({
   folders,
   loading,
   error,
-  totalTerms,
+  totalTerms: _totalTerms,
   onAddDocuments,
   onRefresh,
   onViewDocument,
@@ -81,8 +81,6 @@ export function DocumentsPage({
     const matchesFilter = !filter || d.filename.toLowerCase().includes(filter.toLowerCase());
     return matchesFolder && matchesFilter;
   });
-
-  const totalSize = documents.reduce((s, d) => s + d.file_size, 0);
 
   // ── Document Operations ──────────────────────────────────────────────────────
 
@@ -265,20 +263,20 @@ export function DocumentsPage({
         style={{
           display: "flex",
           flexDirection: "row",
-          alignItems: "flex-end",
+          alignItems: "flex-start",
           justifyContent: "space-between",
           gap: "var(--space-md)",
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {currentFolderId === null ? (
             <>
-              <h1 className="text-headline-lg" style={{ color: "var(--color-on-surface)", letterSpacing: "-0.02em" }}>
+              <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>
                 Documents
               </h1>
-              <p className="text-body-md" style={{ color: "var(--color-on-surface-variant)" }}>
-                Organize your documents manually into folders and monitor inverted index health.
+              <p className="text-body-sm" style={{ color: "var(--color-on-surface-variant)" }}>
+                Organize your text files into folders and search them when needed.
               </p>
             </>
           ) : (
@@ -293,13 +291,13 @@ export function DocumentsPage({
                   <span className="icon" style={{ fontSize: "14px" }}>arrow_back</span>
                   <span>All Documents</span>
                 </button>
-                <span className="text-mono-meta" style={{ color: "color-mix(in srgb, var(--color-on-surface-variant) 40%, transparent)" }}>/</span>
+                <span className="text-mono-meta" style={{ color: "var(--color-outline-variant)" }}>/</span>
                 <span className="text-mono-meta" style={{ color: "var(--color-primary)", fontWeight: 600 }}>
                   {currentFolder?.name ?? "Folder"}
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginTop: "4px" }}>
-                <h1 className="text-headline-lg" style={{ color: "var(--color-on-surface)", letterSpacing: "-0.02em" }}>
+                <h1 className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>
                   {currentFolder?.name}
                 </h1>
                 <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>
@@ -363,51 +361,6 @@ export function DocumentsPage({
         </div>
       </div>
 
-      {/* Stat cells */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "var(--space-md)" }}>
-        <div className="stat-cell">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--color-on-surface-variant)" }}>
-            <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>Total corpus</span>
-            <span className="icon" style={{ fontSize: "16px" }}>description</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-            <span className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>{documents.length}</span>
-            <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>files</span>
-          </div>
-        </div>
-
-        <div className="stat-cell">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--color-on-surface-variant)" }}>
-            <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>Folders</span>
-            <span className="icon" style={{ fontSize: "16px" }}>folder</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-            <span className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>{folders.length}</span>
-            <span className="text-mono-meta" style={{ color: "var(--color-on-surface-variant)" }}>folders</span>
-          </div>
-        </div>
-
-        <div className="stat-cell">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--color-on-surface-variant)" }}>
-            <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>Indexed terms</span>
-            <span className="icon" style={{ fontSize: "16px" }}>tag</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-            <span className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>{totalTerms.toLocaleString()}</span>
-          </div>
-        </div>
-
-        <div className="stat-cell">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", color: "var(--color-on-surface-variant)" }}>
-            <span className="text-label-sm" style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>Storage size</span>
-            <span className="icon" style={{ fontSize: "16px" }}>database</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-xs)" }}>
-            <span className="text-headline-md" style={{ color: "var(--color-on-surface)" }}>{formatFileSize(totalSize)}</span>
-          </div>
-        </div>
-      </div>
-
       {/* Folders Section (Only in Root view) */}
       {currentFolderId === null && (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
@@ -440,7 +393,7 @@ export function DocumentsPage({
                   className="folder-card"
                   onClick={() => setCurrentFolderId(folder.id)}
                 >
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
                       <span className="icon" style={{ fontSize: "22px", color: "var(--color-primary)", flexShrink: 0 }}>folder</span>
                       <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
