@@ -8,7 +8,8 @@ Document management endpoints:
 """
 
 from typing import Optional
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from urllib.parse import quote
+from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
 from app.schemas.document import (
     DocumentCopyRequest,
@@ -17,7 +18,7 @@ from app.schemas.document import (
     DocumentOut,
     DocumentUpdate,
 )
-from app.services import document_service
+from app.services import document_service, pdf_service
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
@@ -47,6 +48,56 @@ def get_document(doc_id: int):
         raise HTTPException(
             status_code=500,
             detail="Document record exists, but the file is missing from disk.",
+        )
+
+
+@router.get("/{doc_id}/download", summary="Download document as TXT or PDF")
+def download_document(doc_id: int, format: str = "txt"):
+    """
+    Download an existing document as either original plain text (.txt) or formatted PDF (.pdf).
+    """
+    fmt = format.strip().lower()
+    if fmt not in ("txt", "pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid format. Supported formats are 'txt' and 'pdf'.",
+        )
+
+    try:
+        doc = document_service.get_document(doc_id)
+        if not doc:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Document with id={doc_id} was not found.",
+            )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=500,
+            detail="Document record exists, but the file is missing from disk.",
+        )
+
+    if fmt == "txt":
+        filename = doc["filename"]
+        ascii_filename = filename.replace('"', '\\"')
+        encoded_filename = quote(filename)
+        return Response(
+            content=doc["content"].encode("utf-8"),
+            media_type="text/plain; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{ascii_filename}"; filename*=utf-8\'\'{encoded_filename}'
+            },
+        )
+    else:  # pdf
+        pdf_filename = pdf_service.get_pdf_filename(doc["filename"])
+        pdf_bytes = pdf_service.generate_document_pdf(doc["filename"], doc["content"])
+        ascii_filename = pdf_filename.replace('"', '\\"')
+        encoded_filename = quote(pdf_filename)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{ascii_filename}"; filename*=utf-8\'\'{encoded_filename}'
+            },
         )
 
 

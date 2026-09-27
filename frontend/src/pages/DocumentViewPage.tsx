@@ -18,6 +18,7 @@ interface DocumentViewPageProps {
 
 export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPageProps) {
   const [deleting, setDeleting] = useState(false);
+  const [downloadingFormat, setDownloadingFormat] = useState<"txt" | "pdf" | null>(null);
   const [detail, setDetail] = useState<DocDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +37,17 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
     }
     load();
   }, [doc.id]);
+
+  async function handleDownload(format: "txt" | "pdf") {
+    setDownloadingFormat(format);
+    try {
+      await api.downloadAndSaveDocument(doc.id, format, doc.filename);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setDownloadingFormat(null);
+    }
+  }
 
   async function handleDelete() {
     if (!confirm(`Delete "${doc.filename}"? This cannot be undone.`)) return;
@@ -63,7 +75,7 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
       </button>
 
       {/* Document header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-md)" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-md)", flexWrap: "wrap" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
             <span className="icon" style={{ fontSize: "20px", color: "var(--color-primary)" }}>description</span>
@@ -78,19 +90,70 @@ export function DocumentViewPage({ doc, onBack, onDeleted }: DocumentViewPagePro
             </span>
           </div>
         </div>
-        <button
-          className="btn-danger"
-          onClick={handleDelete}
-          disabled={deleting}
-          style={{ flexShrink: 0 }}
-        >
-          {deleting ? (
-            <span className="icon spin" style={{ fontSize: "14px" }}>refresh</span>
-          ) : (
-            <span className="icon" style={{ fontSize: "14px" }}>delete</span>
-          )}
-          <span>{deleting ? "Deleting..." : "Delete"}</span>
-        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              background: "var(--color-surface-container-low)",
+              border: "1px solid var(--color-outline-variant)",
+              borderRadius: "var(--radius-sm)",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              className="btn-ghost"
+              onClick={() => handleDownload("txt")}
+              disabled={downloadingFormat !== null}
+              style={{
+                padding: "6px 10px",
+                fontSize: "0.8125rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                border: "none",
+                borderRadius: 0,
+              }}
+              title="Download as Text (.txt)"
+            >
+              <span className="icon" style={{ fontSize: "15px" }}>description</span>
+              <span>Text (.txt)</span>
+            </button>
+            <div style={{ width: "1px", height: "16px", background: "var(--color-outline-variant)" }} />
+            <button
+              className="btn-ghost"
+              onClick={() => handleDownload("pdf")}
+              disabled={downloadingFormat !== null}
+              style={{
+                padding: "6px 10px",
+                fontSize: "0.8125rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                border: "none",
+                borderRadius: 0,
+              }}
+              title="Download as PDF (.pdf)"
+            >
+              <span className="icon" style={{ fontSize: "15px" }}>picture_as_pdf</span>
+              <span>PDF (.pdf)</span>
+            </button>
+          </div>
+
+          <button
+            className="btn-danger"
+            onClick={handleDelete}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <span className="icon spin" style={{ fontSize: "14px" }}>refresh</span>
+            ) : (
+              <span className="icon" style={{ fontSize: "14px" }}>delete</span>
+            )}
+            <span>{deleting ? "Deleting..." : "Delete"}</span>
+          </button>
+        </div>
       </div>
 
       {/* Metadata grid */}

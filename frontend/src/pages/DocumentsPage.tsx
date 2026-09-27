@@ -42,6 +42,8 @@ export function DocumentsPage({
   const [filter, setFilter] = useState("");
   const [deletingDocId, setDeletingDocId] = useState<number | null>(null);
   const [activeMenuDocId, setActiveMenuDocId] = useState<number | null>(null);
+  const [menuOpenUpward, setMenuOpenUpward] = useState(false);
+  const [openDownloadSubmenuDocId, setOpenDownloadSubmenuDocId] = useState<number | null>(null);
 
   // Folder modal state
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -108,6 +110,38 @@ export function DocumentsPage({
     setRenamingDoc(doc);
     setNewDocFilename(doc.filename);
     setRenameDocError(null);
+  }
+
+  function handleToggleMenu(e: React.MouseEvent<HTMLButtonElement>, docId: number) {
+    e.stopPropagation();
+    if (activeMenuDocId === docId) {
+      setActiveMenuDocId(null);
+      return;
+    }
+    const buttonRect = e.currentTarget.getBoundingClientRect();
+    const spaceBelowViewport = window.innerHeight - buttonRect.bottom;
+    const spaceAboveViewport = buttonRect.top;
+
+    const tableContainer = e.currentTarget.closest(".doc-table-container");
+    const containerRect = tableContainer?.getBoundingClientRect();
+    const spaceBelowContainer = containerRect ? containerRect.bottom - buttonRect.bottom : Infinity;
+
+    // Open upward if near bottom of viewport (< 210px) or near bottom of table container (< 80px),
+    // provided there is enough space above
+    const openUpward = (spaceBelowViewport < 210 || spaceBelowContainer < 80) && spaceAboveViewport > 180;
+    setMenuOpenUpward(openUpward);
+    setOpenDownloadSubmenuDocId(null);
+    setActiveMenuDocId(docId);
+  }
+
+  async function handleDownloadDoc(doc: DocFile, format: "txt" | "pdf") {
+    setActiveMenuDocId(null);
+    setOpenDownloadSubmenuDocId(null);
+    try {
+      await api.downloadAndSaveDocument(doc.id, format, doc.filename);
+    } catch (e) {
+      alert((e as Error).message);
+    }
   }
 
   async function handleConfirmMove() {
@@ -223,6 +257,7 @@ export function DocumentsPage({
       }}
       onClick={() => {
         if (activeMenuDocId !== null) setActiveMenuDocId(null);
+        if (openDownloadSubmenuDocId !== null) setOpenDownloadSubmenuDocId(null);
       }}
     >
       {/* Page / Folder Navigation Header */}
@@ -525,8 +560,8 @@ export function DocumentsPage({
 
       {/* Documents Table */}
       {!loading && !error && (
-        <div style={{ background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md)", overflow: "visible" }}>
-          <div style={{ overflowX: "auto" }}>
+        <div className="doc-table-container" style={{ background: "var(--color-surface-container-low)", borderRadius: "var(--radius-md)", overflow: "visible" }}>
+          <div style={{ overflow: "visible" }}>
             <table className="doc-table">
               <thead>
                 <tr>
@@ -651,19 +686,17 @@ export function DocumentsPage({
                           </button>
 
                           {/* Unobtrusive Action Menu Dropdown */}
-                          <div className="action-menu-container">
+                          <div className={`action-menu-container ${activeMenuDocId === doc.id ? "active" : ""}`}>
                             <button
                               className="btn-icon"
                               title="Document actions"
-                              onClick={() =>
-                                setActiveMenuDocId(activeMenuDocId === doc.id ? null : doc.id)
-                              }
+                              onClick={(e) => handleToggleMenu(e, doc.id)}
                             >
                               <span className="icon" style={{ fontSize: "16px" }}>more_vert</span>
                             </button>
 
                             {activeMenuDocId === doc.id && (
-                              <div className="action-menu-dropdown">
+                              <div className={`action-menu-dropdown ${menuOpenUpward ? "open-upward" : ""}`}>
                                 <button
                                   className="action-menu-item"
                                   onClick={() => {
@@ -681,6 +714,39 @@ export function DocumentsPage({
                                   <span className="icon" style={{ fontSize: "15px" }}>edit</span>
                                   <span>Rename</span>
                                 </button>
+                                <div
+                                  className={`action-menu-submenu-wrapper ${openDownloadSubmenuDocId === doc.id ? "open" : ""}`}
+                                  onMouseEnter={() => setOpenDownloadSubmenuDocId(doc.id)}
+                                  onMouseLeave={() => setOpenDownloadSubmenuDocId(null)}
+                                >
+                                  <button
+                                    className="action-menu-item"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenDownloadSubmenuDocId(openDownloadSubmenuDocId === doc.id ? null : doc.id);
+                                    }}
+                                  >
+                                    <span className="icon" style={{ fontSize: "15px" }}>download</span>
+                                    <span style={{ flex: 1 }}>Download</span>
+                                    <span className="icon" style={{ fontSize: "14px", color: "var(--color-outline)" }}>chevron_left</span>
+                                  </button>
+                                  <div className="action-menu-submenu">
+                                    <button
+                                      className="action-menu-item"
+                                      onClick={() => handleDownloadDoc(doc, "txt")}
+                                    >
+                                      <span className="icon" style={{ fontSize: "15px" }}>description</span>
+                                      <span>Text (.txt)</span>
+                                    </button>
+                                    <button
+                                      className="action-menu-item"
+                                      onClick={() => handleDownloadDoc(doc, "pdf")}
+                                    >
+                                      <span className="icon" style={{ fontSize: "15px" }}>picture_as_pdf</span>
+                                      <span>PDF (.pdf)</span>
+                                    </button>
+                                  </div>
+                                </div>
                                 <button
                                   className="action-menu-item"
                                   onClick={() => handleOpenMoveModal(doc)}

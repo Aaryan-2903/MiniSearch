@@ -221,4 +221,66 @@ export const api = {
   rebuildIndex(): Promise<RebuildResponse> {
     return request<RebuildResponse>("/index/rebuild", { method: "POST" });
   },
+
+  async downloadDocument(
+    id: number,
+    format: "txt" | "pdf",
+    fallbackFilename?: string
+  ): Promise<{ blob: Blob; filename: string }> {
+    const res = await fetch(`${BASE_URL}/documents/${id}/download?format=${format}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.detail ?? `Download failed: ${res.status}`);
+    }
+
+    const defaultName = fallbackFilename
+      ? format === "pdf"
+        ? fallbackFilename.toLowerCase().endsWith(".txt")
+          ? fallbackFilename.slice(0, -4) + ".pdf"
+          : `${fallbackFilename}.pdf`
+        : fallbackFilename
+      : `document-${id}.${format}`;
+
+    const filename = extractFilenameFromHeaders(res.headers.get("content-disposition"), defaultName);
+    const blob = await res.blob();
+    return { blob, filename };
+  },
+
+  async downloadAndSaveDocument(
+    id: number,
+    format: "txt" | "pdf",
+    fallbackFilename?: string
+  ): Promise<string> {
+    const { blob, filename } = await this.downloadDocument(id, format, fallbackFilename);
+    triggerFileDownload(blob, filename);
+    return filename;
+  },
 };
+
+export function extractFilenameFromHeaders(disposition: string | null, fallback: string): string {
+  if (!disposition) return fallback;
+  const utf8Match = disposition.match(/filename\*=utf-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1].trim());
+    } catch {
+      // ignore decode failure and fall through
+    }
+  }
+  const regularMatch = disposition.match(/filename="?([^";]+)"?/i);
+  if (regularMatch?.[1]) {
+    return regularMatch[1].trim();
+  }
+  return fallback;
+}
+
+export function triggerFileDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
