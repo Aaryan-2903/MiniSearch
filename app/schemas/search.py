@@ -12,7 +12,7 @@ class SearchRequest(BaseModel):
     """Incoming search request body."""
     query: str = Field(..., min_length=1, description="Search query string")
     top_k: int = Field(default=10, ge=1, le=100, description="Maximum number of results to return")
-    match_mode: MatchMode = Field(default=MatchMode.ANY, description="Search match mode: 'any' (OR) or 'all' (AND)")
+    match_mode: Optional[MatchMode] = Field(default=None, description="Search match mode: 'any' (OR) or 'all' (AND). Defaults to engine settings.")
     folder_id: Optional[int] = Field(default=None, description="Optional folder ID to scope search")
 
 

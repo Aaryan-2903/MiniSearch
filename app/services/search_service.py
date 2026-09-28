@@ -49,7 +49,7 @@ def _extract_snippet(text: str, positions: dict) -> str:
     return snippet
 
 
-def search(query: str, top_k: int = 10, match_mode: str = "any", folder_id: Optional[int] = None) -> dict:
+def search(query: str, top_k: int = 10, match_mode: Optional[str] = None, folder_id: Optional[int] = None) -> dict:
     """
     Execute a search query and return ranked results with snippets and TF-IDF explanation.
     Optionally scoped to a specific folder.
@@ -57,7 +57,7 @@ def search(query: str, top_k: int = 10, match_mode: str = "any", folder_id: Opti
     Args:
         query:      Raw query string from the client.
         top_k:      Maximum number of results to return.
-        match_mode: "any" (OR semantics) or "all" (AND semantics).
+        match_mode: "any" (OR semantics) or "all" (AND semantics). Defaults to engine settings.
         folder_id:  Optional folder ID to filter search candidates.
 
     Returns:
@@ -73,6 +73,13 @@ def search(query: str, top_k: int = 10, match_mode: str = "any", folder_id: Opti
         }
     """
     start_time = time.perf_counter()
+
+    settings = crud.get_settings()
+    if match_mode is None:
+        match_mode = settings.get("default_search_mode", "any")
+    case_sensitive = bool(settings.get("case_sensitive", 0))
+    stop_words_enabled = bool(settings.get("stop_words_enabled", 1))
+
     empty_response = {
         "query": query,
         "total_results": 0,
@@ -85,7 +92,11 @@ def search(query: str, top_k: int = 10, match_mode: str = "any", folder_id: Opti
     }
 
     # Step 1: Preprocess query (same pipeline as document indexing).
-    query_terms = preprocess(query)
+    query_terms = preprocess(
+        query,
+        case_sensitive=case_sensitive,
+        stop_words_enabled=stop_words_enabled,
+    )
     if not query_terms:
         empty_response["execution_time_ms"] = round((time.perf_counter() - start_time) * 1000, 2)
         return empty_response

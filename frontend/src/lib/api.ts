@@ -130,6 +130,24 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface EngineSettings {
+  case_sensitive: boolean;
+  stop_words_enabled: boolean;
+  default_search_mode: "any" | "all";
+  max_file_size_mb: number;
+  ranking_algorithm: string;
+  accepted_file_types: string[];
+  rebuild_required: boolean;
+}
+
+export interface EngineSettingsUpdate {
+  case_sensitive?: boolean;
+  stop_words_enabled?: boolean;
+  default_search_mode?: "any" | "all";
+  max_file_size_mb?: number;
+}
+
+
 // ── API calls ──────────────────────────────────────────────────────────────────
 
 export const api = {
@@ -220,6 +238,17 @@ export const api = {
 
   rebuildIndex(): Promise<RebuildResponse> {
     return request<RebuildResponse>("/index/rebuild", { method: "POST" });
+  },
+
+  getSettings(): Promise<EngineSettings> {
+    return request<EngineSettings>("/settings");
+  },
+
+  updateSettings(payload: EngineSettingsUpdate): Promise<EngineSettings> {
+    return request<EngineSettings>("/settings", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    });
   },
 
   async downloadDocument(

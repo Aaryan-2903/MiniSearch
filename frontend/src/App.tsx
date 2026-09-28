@@ -19,7 +19,7 @@ import { DocumentsPage } from "./pages/DocumentsPage";
 import { IndexPage } from "./pages/IndexPage";
 import { DocumentViewPage } from "./pages/DocumentViewPage";
 import { api } from "./lib/api";
-import type { DocFile, IndexStats, Folder } from "./lib/api";
+import type { DocFile, IndexStats, Folder, EngineSettings } from "./lib/api";
 
 type Page = "search" | "documents" | "index" | "settings";
 
@@ -39,6 +39,8 @@ export default function App() {
   const [stats, setStats] = useState<IndexStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+
+  const [settings, setSettings] = useState<EngineSettings | null>(null);
 
   const fetchDocuments = useCallback(async () => {
     setDocsLoading(true);
@@ -75,11 +77,21 @@ export default function App() {
     }
   }, []);
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await api.getSettings();
+      setSettings(res);
+    } catch {
+      // keep existing
+    }
+  }, []);
+
   const refreshAll = useCallback(() => {
     fetchDocuments();
     fetchFolders();
     fetchStats();
-  }, [fetchDocuments, fetchFolders, fetchStats]);
+    fetchSettings();
+  }, [fetchDocuments, fetchFolders, fetchStats, fetchSettings]);
 
   useEffect(() => {
     refreshAll();
@@ -141,6 +153,7 @@ export default function App() {
               stats={stats}
               recentDocs={recentDocs}
               folders={folders}
+              defaultMatchMode={settings?.default_search_mode ?? "any"}
               onViewDocument={handleViewDocument}
             />
           ) : activePage === "documents" ? (
@@ -162,7 +175,7 @@ export default function App() {
               stats={stats}
               loading={statsLoading}
               error={statsError}
-              onRefresh={fetchStats}
+              onRefresh={refreshAll}
               initialTab="index"
               totalSize={documents.reduce((s, d) => s + d.file_size, 0)}
             />
@@ -172,7 +185,7 @@ export default function App() {
               stats={stats}
               loading={statsLoading}
               error={statsError}
-              onRefresh={fetchStats}
+              onRefresh={refreshAll}
               initialTab="settings"
               totalSize={documents.reduce((s, d) => s + d.file_size, 0)}
             />

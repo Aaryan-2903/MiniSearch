@@ -59,6 +59,22 @@ _CREATE_SCHEMA = """
     -- Seed the single-row meta table on first run.
     INSERT OR IGNORE INTO index_meta (id, total_documents, total_unique_terms, index_status)
     VALUES (1, 0, 0, 'empty');
+
+    CREATE TABLE IF NOT EXISTS settings (
+        id                     INTEGER PRIMARY KEY CHECK (id = 1),
+        case_sensitive         INTEGER NOT NULL DEFAULT 0,
+        stop_words_enabled     INTEGER NOT NULL DEFAULT 1,
+        default_search_mode    TEXT    NOT NULL DEFAULT 'any',
+        max_file_size_mb       INTEGER NOT NULL DEFAULT 5,
+        rebuild_required       INTEGER NOT NULL DEFAULT 0,
+        indexed_case_sensitive INTEGER NOT NULL DEFAULT 0,
+        indexed_stop_words     INTEGER NOT NULL DEFAULT 1
+    );
+
+    INSERT OR IGNORE INTO settings (
+        id, case_sensitive, stop_words_enabled, default_search_mode, max_file_size_mb,
+        rebuild_required, indexed_case_sensitive, indexed_stop_words
+    ) VALUES (1, 0, 1, 'any', 5, 0, 0, 1);
 """
 
 

@@ -24,7 +24,7 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from app.db.database import init_db  # noqa: E402
-from app.api import health, documents, search, index, folders  # noqa: E402
+from app.api import health, documents, search, index, folders, settings  # noqa: E402
 
 
 @asynccontextmanager
@@ -67,3 +67,5 @@ app.include_router(documents.router)
 app.include_router(folders.router)
 app.include_router(search.router)
 app.include_router(index.router)
+app.include_router(settings.router)
+

@@ -19,11 +19,13 @@ from app.schemas.document import (
     DocumentUpdate,
 )
 from app.services import document_service, pdf_service
+from app.db import crud
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
-# Maximum allowed file size: 5 MB
+# Default maximum allowed file size fallback (5 MB)
 MAX_FILE_SIZE = 5 * 1024 * 1024
+
 
 
 @router.get("", response_model=DocumentListOut, summary="List all documents")
@@ -125,10 +127,14 @@ async def upload_document(
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    if len(content) > MAX_FILE_SIZE:
+    settings = crud.get_settings()
+    max_mb = settings.get("max_file_size_mb", 5)
+    max_bytes = max_mb * 1024 * 1024
+
+    if len(content) > max_bytes:
         raise HTTPException(
             status_code=413,
-            detail=f"File exceeds the maximum allowed size of {MAX_FILE_SIZE // (1024*1024)} MB.",
+            detail=f"File exceeds the maximum allowed size of {max_mb} MB.",
         )
 
     try:

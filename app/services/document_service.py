@@ -65,8 +65,16 @@ def upload_document(filename: str, content: bytes, folder_id: Optional[int] = No
     # Decode raw bytes to text.
     text = content.decode("utf-8", errors="replace")
 
+    settings = crud.get_settings()
+    case_sensitive = bool(settings.get("case_sensitive", 0))
+    stop_words_enabled = bool(settings.get("stop_words_enabled", 1))
+
     # Preprocess: get { term: {tf, positions} } for indexing.
-    term_data = preprocess_with_positions(text)
+    term_data = preprocess_with_positions(
+        text,
+        case_sensitive=case_sensitive,
+        stop_words_enabled=stop_words_enabled,
+    )
     token_count = sum(data["tf"] for data in term_data.values())
     uploaded_at = datetime.now(timezone.utc).isoformat()
 
@@ -95,6 +103,10 @@ def upload_document(filename: str, content: bytes, folder_id: Optional[int] = No
 
     # Keep index_meta accurate.
     _sync_index_meta(uploaded_at)
+
+    # If the corpus has only this document, ensure index settings are marked in sync
+    if crud.get_total_document_count() == 1:
+        crud.mark_rebuild_complete(case_sensitive, stop_words_enabled)
 
     return crud.get_document_by_id(doc_id)  # type: ignore[return-value]
 

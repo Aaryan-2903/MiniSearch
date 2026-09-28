@@ -17,6 +17,7 @@ interface SearchPageProps {
   stats: IndexStats | null;
   recentDocs: DocFile[];
   folders?: Folder[];
+  defaultMatchMode?: "any" | "all";
   onViewDocument: (doc: DocFile) => void;
 }
 
@@ -303,9 +304,22 @@ function ResultCard({
   );
 }
 
-export function SearchPage({ stats, recentDocs, folders = [], onViewDocument }: SearchPageProps) {
+export function SearchPage({
+  stats,
+  recentDocs,
+  folders = [],
+  defaultMatchMode = "any",
+  onViewDocument,
+}: SearchPageProps) {
   const [query, setQuery] = useState("");
-  const [matchMode, setMatchMode] = useState<"any" | "all">("any");
+  const [matchMode, setMatchMode] = useState<"any" | "all">(defaultMatchMode);
+
+  useEffect(() => {
+    if (defaultMatchMode) {
+      setMatchMode(defaultMatchMode);
+    }
+  }, [defaultMatchMode]);
+
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<"relevance" | "name_asc" | "name_desc">("relevance");
   const [results, setResults] = useState<SearchResponse | null>(null);

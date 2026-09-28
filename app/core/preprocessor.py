@@ -32,12 +32,13 @@ STOP_WORDS: frozenset = frozenset({
 })
 
 
-def clean_text(text: str) -> str:
+def clean_text(text: str, case_sensitive: bool = False) -> str:
     """
-    Stage 1: Lowercase → replace punctuation with spaces → collapse whitespace.
+    Stage 1: Lowercase (if not case_sensitive) → replace punctuation with spaces → collapse whitespace.
     Digits are removed to avoid noise tokens like '2024', '3rd', etc.
     """
-    text = text.lower()
+    if not case_sensitive:
+        text = text.lower()
     text = re.sub(r"[^\w\s]", " ", text)   # punctuation → space
     text = re.sub(r"\b\d+\b", " ", text)   # standalone digit sequences → space
     text = re.sub(r"\s+", " ", text).strip()
@@ -49,20 +50,40 @@ def tokenize(text: str) -> List[str]:
     return text.split()
 
 
-def remove_stop_words(tokens: List[str]) -> List[str]:
-    """Stage 3: Drop stop words and single-character tokens."""
-    return [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
+def remove_stop_words(
+    tokens: List[str],
+    case_sensitive: bool = False,
+    stop_words_enabled: bool = True,
+) -> List[str]:
+    """Stage 3: Drop stop words and single-character tokens (if enabled)."""
+    if not stop_words_enabled:
+        return [t for t in tokens if len(t) > 0]
+    return [t for t in tokens if (t.lower() if case_sensitive else t) not in STOP_WORDS and len(t) > 1]
 
 
-def preprocess(text: str) -> List[str]:
+def preprocess(
+    text: str,
+    case_sensitive: bool = False,
+    stop_words_enabled: bool = True,
+) -> List[str]:
     """
     Full pipeline returning a list of tokens.
     Used at query time (no position tracking needed).
     """
-    return remove_stop_words(tokenize(clean_text(text)))
+    cleaned = clean_text(text, case_sensitive=case_sensitive)
+    tokens = tokenize(cleaned)
+    return remove_stop_words(
+        tokens,
+        case_sensitive=case_sensitive,
+        stop_words_enabled=stop_words_enabled,
+    )
 
 
-def preprocess_with_positions(text: str) -> Dict[str, dict]:
+def preprocess_with_positions(
+    text: str,
+    case_sensitive: bool = False,
+    stop_words_enabled: bool = True,
+) -> Dict[str, dict]:
     """
     Full pipeline returning term metadata for indexing.
 
@@ -73,20 +94,24 @@ def preprocess_with_positions(text: str) -> Dict[str, dict]:
     used later to extract search result snippets without re-reading the file.
     """
     term_data: Dict[str, dict] = {}
-    cleaned = clean_text(text)
+    cleaned = clean_text(text, case_sensitive=case_sensitive)
     tokens = tokenize(cleaned)
-    lowered = text.lower()
+    target_text = text if case_sensitive else text.lower()
 
     search_start = 0
     for token in tokens:
-        # Find this token's position in the original lowercased text.
-        idx = lowered.find(token, search_start)
+        # Find this token's position in the target text.
+        idx = target_text.find(token, search_start)
         if idx == -1:
             continue
         search_start = idx + len(token)
 
         # Skip stop words and single-char tokens (after position cursor is advanced).
-        if token in STOP_WORDS or len(token) <= 1:
+        if stop_words_enabled:
+            check_term = token.lower() if case_sensitive else token
+            if check_term in STOP_WORDS or len(token) <= 1:
+                continue
+        elif len(token) == 0:
             continue
 
         if token not in term_data:

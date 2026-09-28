@@ -46,3 +46,15 @@ class IndexMeta:
     total_unique_terms: int
     last_built_at: Optional[str]
     index_status: str  # "empty" | "building" | "ready"
+
+
+@dataclass
+class Settings:
+    id: int
+    case_sensitive: bool
+    stop_words_enabled: bool
+    default_search_mode: str
+    max_file_size_mb: int
+    rebuild_required: bool
+    indexed_case_sensitive: bool
+    indexed_stop_words: bool

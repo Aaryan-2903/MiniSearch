@@ -9,6 +9,7 @@ Grouped sections:
     1. Documents
     2. Postings
     3. Index Meta
+    4. Settings
 """
 
 import json
@@ -299,3 +300,67 @@ def set_index_status(status: str) -> None:
             "UPDATE index_meta SET index_status = ? WHERE id = 1",
             (status,),
         )
+
+
+# ── 4. Settings ────────────────────────────────────────────────────────────────
+
+def get_settings() -> dict:
+    """Return the single settings row as a dict."""
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+        if not row:
+            conn.execute(
+                """INSERT OR IGNORE INTO settings
+                   (id, case_sensitive, stop_words_enabled, default_search_mode, max_file_size_mb, rebuild_required, indexed_case_sensitive, indexed_stop_words)
+                   VALUES (1, 0, 1, 'any', 5, 0, 0, 1)"""
+            )
+            row = conn.execute("SELECT * FROM settings WHERE id = 1").fetchone()
+        return dict(row)
+
+
+def update_settings(fields: dict) -> dict:
+    """Update settings fields and recalculate rebuild_required."""
+    current = get_settings()
+
+    new_case_sensitive = fields.get("case_sensitive", bool(current["case_sensitive"]))
+    new_stop_words = fields.get("stop_words_enabled", bool(current["stop_words_enabled"]))
+    new_search_mode = fields.get("default_search_mode", current["default_search_mode"])
+    new_max_size = fields.get("max_file_size_mb", current["max_file_size_mb"])
+
+    rebuild_required = int(
+        bool(new_case_sensitive) != bool(current["indexed_case_sensitive"])
+        or bool(new_stop_words) != bool(current["indexed_stop_words"])
+    )
+
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE settings
+               SET case_sensitive      = ?,
+                   stop_words_enabled  = ?,
+                   default_search_mode = ?,
+                   max_file_size_mb    = ?,
+                   rebuild_required    = ?
+               WHERE id = 1""",
+            (
+                1 if new_case_sensitive else 0,
+                1 if new_stop_words else 0,
+                new_search_mode,
+                new_max_size,
+                rebuild_required,
+            ),
+        )
+    return get_settings()
+
+
+def mark_rebuild_complete(case_sensitive: bool, stop_words_enabled: bool) -> None:
+    """Mark rebuild as complete and synchronize indexed preprocessing settings."""
+    with get_db() as conn:
+        conn.execute(
+            """UPDATE settings
+               SET rebuild_required       = 0,
+                   indexed_case_sensitive = ?,
+                   indexed_stop_words     = ?
+               WHERE id = 1""",
+            (1 if case_sensitive else 0, 1 if stop_words_enabled else 0),
+        )
+
